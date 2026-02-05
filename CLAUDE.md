@@ -11,13 +11,23 @@ https://github.com/ARZER-TW/agent-vault
 
 ## Git 工作流程
 
-**重要**：每完成一個功能或階段就要 commit，保持小而頻繁的提交。
+### 必須遵守：每次實作完更動後都要 COMMIT
+
+這是強制規則，不是建議。每完成以下任一項就要 commit + push：
+- 完成一個檔案
+- 完成一個功能
+- 修復一個 bug
+- 任何有意義的進度
+
+**不要**累積大量更動才一次 commit。
 
 ```bash
 # 提交格式
 git add <specific-files>
-git commit -m "feat: 簡短描述"
+git commit -m "type: 簡短描述"
 git push
+
+# type: feat, fix, docs, refactor, test, chore
 ```
 
 ## 開發規則
