@@ -1,5 +1,9 @@
 # AgentVault - CLAUDE.md
 
+## Repository
+
+https://github.com/ARZER-TW/agent-vault
+
 ## 專案快速指引
 
 - 讀取 `TECH_SPEC.md` 了解核心目標和設計理念
