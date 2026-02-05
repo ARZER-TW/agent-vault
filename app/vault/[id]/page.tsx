@@ -6,10 +6,10 @@ import { Header } from "@/components/layout/header";
 import { AgentActivityLog } from "@/components/agent/agent-activity-log";
 import { useAuthStore } from "@/lib/store/auth-store";
 import { useVaultStore } from "@/lib/store/vault-store";
-import { getVault } from "@/lib/vault/service";
+import { getVault, getAgentCaps } from "@/lib/vault/service";
 import { runAgentCycle } from "@/lib/agent/runtime";
 import { mistToSui } from "@/lib/constants";
-import type { VaultData } from "@/lib/vault/types";
+import type { VaultData, AgentCapData } from "@/lib/vault/types";
 
 export default function VaultDetailPage() {
   const params = useParams();
@@ -17,14 +17,23 @@ export default function VaultDetailPage() {
   const { address } = useAuthStore();
   const { addAgentLog } = useVaultStore();
   const [vault, setVault] = useState<VaultData | null>(null);
+  const [agentCaps, setAgentCaps] = useState<AgentCapData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
 
+  // Fetch vault data and user's AgentCaps
   useEffect(() => {
-    async function fetchVault() {
+    async function fetchData() {
       try {
-        const data = await getVault(vaultId);
-        setVault(data);
+        const vaultData = await getVault(vaultId);
+        setVault(vaultData);
+
+        // If user is logged in, find their AgentCaps for this vault
+        if (address) {
+          const caps = await getAgentCaps(address);
+          const vaultCaps = caps.filter((cap) => cap.vaultId === vaultId);
+          setAgentCaps(vaultCaps);
+        }
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Failed to fetch vault";
@@ -34,18 +43,29 @@ export default function VaultDetailPage() {
       }
     }
 
-    if (vaultId) fetchVault();
-  }, [vaultId]);
+    if (vaultId) fetchData();
+  }, [vaultId, address]);
+
+  // Find a valid AgentCap that is also authorized on the vault
+  const activeAgentCap = agentCaps.find((cap) =>
+    vault?.authorizedCaps.includes(cap.id),
+  );
 
   async function handleRunAgent() {
     if (!vault || !address) return;
 
+    if (!activeAgentCap) {
+      alert(
+        "No authorized AgentCap found. The vault owner must mint an AgentCap for your address first.",
+      );
+      return;
+    }
+
     setIsRunning(true);
     try {
-      // For demo, agentCapId and agentAddress would come from the user's agent setup
       const result = await runAgentCycle({
         vaultId: vault.id,
-        agentCapId: "0x_agent_cap_placeholder",
+        agentCapId: activeAgentCap.id,
         agentAddress: address,
         ownerAddress: vault.owner,
       });
@@ -161,12 +181,29 @@ export default function VaultDetailPage() {
             {/* Agent Controls */}
             <div className="p-6 bg-gray-900 rounded-xl border border-gray-800">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-bold text-gray-300">
-                  AI Agent
-                </h2>
+                <div>
+                  <h2 className="text-sm font-bold text-gray-300">AI Agent</h2>
+                  {activeAgentCap ? (
+                    <p className="text-xs text-green-400 mt-1">
+                      AgentCap: {activeAgentCap.id.slice(0, 10)}...
+                    </p>
+                  ) : address ? (
+                    <p className="text-xs text-yellow-400 mt-1">
+                      No authorized AgentCap found for your address
+                    </p>
+                  ) : (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Login to run the agent
+                    </p>
+                  )}
+                </div>
                 <button
                   onClick={handleRunAgent}
-                  disabled={isRunning || Date.now() >= vault.policy.expiresAt}
+                  disabled={
+                    isRunning ||
+                    !activeAgentCap ||
+                    Date.now() >= vault.policy.expiresAt
+                  }
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 text-white text-sm font-medium rounded-lg transition-colors"
                 >
                   {isRunning ? "Running..." : "Run Agent Cycle"}

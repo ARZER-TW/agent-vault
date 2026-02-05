@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuthStore } from "@/lib/store/auth-store";
 import { buildCreateVault } from "@/lib/vault/ptb-builder";
 import { executeSponsoredTransaction } from "@/lib/auth/sponsored-tx";
-import { suiToMist } from "@/lib/constants";
+import { suiToMist, mistToSui } from "@/lib/constants";
+import { getSuiCoins, type CoinItem } from "@/lib/sui/coins";
 
 interface FormData {
   depositAmount: string;
@@ -13,6 +14,7 @@ interface FormData {
   cooldownSeconds: string;
   expiresInHours: string;
   allowSwap: boolean;
+  selectedCoinId: string;
 }
 
 export function CreateVaultForm() {
@@ -20,6 +22,8 @@ export function CreateVaultForm() {
     useAuthStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [txDigest, setTxDigest] = useState<string | null>(null);
+  const [coins, setCoins] = useState<CoinItem[]>([]);
+  const [isLoadingCoins, setIsLoadingCoins] = useState(false);
   const [form, setForm] = useState<FormData>({
     depositAmount: "1",
     maxBudget: "0.5",
@@ -27,15 +31,49 @@ export function CreateVaultForm() {
     cooldownSeconds: "60",
     expiresInHours: "24",
     allowSwap: true,
+    selectedCoinId: "",
   });
+
+  // Fetch user's SUI coins when address changes
+  useEffect(() => {
+    if (!address) return;
+
+    async function fetchCoins() {
+      setIsLoadingCoins(true);
+      try {
+        const userCoins = await getSuiCoins(address!);
+        setCoins(userCoins);
+        // Auto-select the largest coin
+        if (userCoins.length > 0) {
+          setForm((prev) => ({
+            ...prev,
+            selectedCoinId: userCoins[0].objectId,
+          }));
+        }
+      } catch {
+        setCoins([]);
+      } finally {
+        setIsLoadingCoins(false);
+      }
+    }
+
+    fetchCoins();
+  }, [address]);
 
   function updateField(field: keyof FormData, value: string | boolean) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
+  const selectedCoin = coins.find((c) => c.objectId === form.selectedCoinId);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!address || !ephemeralKeypair || !zkProof || maxEpoch === null) return;
+
+    if (!form.selectedCoinId) {
+      alert("Please select a SUI coin to deposit.");
+      return;
+    }
 
     try {
       setIsSubmitting(true);
@@ -46,12 +84,8 @@ export function CreateVaultForm() {
         Date.now() + Number(form.expiresInHours) * 3600 * 1000,
       );
 
-      // TODO: need a coin object ID from user's wallet
-      // For demo, this would come from selecting a coin
-      const coinObjectId = "0x_placeholder";
-
       const tx = buildCreateVault({
-        coinObjectId,
+        coinObjectId: form.selectedCoinId,
         maxBudget: suiToMist(Number(form.maxBudget)),
         maxPerTx: suiToMist(Number(form.maxPerTx)),
         allowedActions,
@@ -117,18 +151,35 @@ export function CreateVaultForm() {
     >
       <h2 className="text-lg font-bold text-white">Create New Vault</h2>
 
+      {/* Coin Selection */}
       <div>
         <label className="block text-sm text-gray-400 mb-1">
-          Initial Deposit (SUI)
+          Select SUI Coin to Deposit
         </label>
-        <input
-          type="number"
-          step="0.01"
-          min="0.01"
-          value={form.depositAmount}
-          onChange={(e) => updateField("depositAmount", e.target.value)}
-          className="w-full px-3 py-2 bg-gray-950 border border-gray-700 rounded-lg text-white focus:border-blue-500 focus:outline-none"
-        />
+        {isLoadingCoins ? (
+          <p className="text-sm text-gray-500">Loading coins...</p>
+        ) : coins.length === 0 ? (
+          <p className="text-sm text-red-400">
+            No SUI coins found. Please fund your account first.
+          </p>
+        ) : (
+          <select
+            value={form.selectedCoinId}
+            onChange={(e) => updateField("selectedCoinId", e.target.value)}
+            className="w-full px-3 py-2 bg-gray-950 border border-gray-700 rounded-lg text-white focus:border-blue-500 focus:outline-none"
+          >
+            {coins.map((coin) => (
+              <option key={coin.objectId} value={coin.objectId}>
+                {mistToSui(coin.balance).toFixed(4)} SUI ({coin.objectId.slice(0, 8)}...{coin.objectId.slice(-4)})
+              </option>
+            ))}
+          </select>
+        )}
+        {selectedCoin && (
+          <p className="text-xs text-gray-500 mt-1">
+            This entire coin ({mistToSui(selectedCoin.balance).toFixed(4)} SUI) will be deposited into the vault.
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -202,7 +253,7 @@ export function CreateVaultForm() {
 
       <button
         type="submit"
-        disabled={isSubmitting}
+        disabled={isSubmitting || coins.length === 0}
         className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 text-white font-medium rounded-lg transition-colors"
       >
         {isSubmitting ? "Creating..." : "Create Vault"}
