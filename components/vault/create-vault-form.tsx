@@ -17,6 +17,28 @@ interface FormData {
   selectedCoinId: string;
 }
 
+function FormField({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label className="block text-xs font-mono font-medium text-gray-400 uppercase tracking-wider mb-2">
+        {label}
+      </label>
+      {children}
+      {hint && (
+        <p className="text-[11px] text-gray-600 mt-1.5">{hint}</p>
+      )}
+    </div>
+  );
+}
+
 export function CreateVaultForm() {
   const { address, ephemeralKeypair, zkProof, maxEpoch, isLoggedIn } =
     useAuthStore();
@@ -34,7 +56,6 @@ export function CreateVaultForm() {
     selectedCoinId: "",
   });
 
-  // Fetch user's SUI coins when address changes
   useEffect(() => {
     if (!address) return;
 
@@ -43,7 +64,6 @@ export function CreateVaultForm() {
       try {
         const userCoins = await getSuiCoins(address!);
         setCoins(userCoins);
-        // Auto-select the largest coin
         if (userCoins.length > 0) {
           setForm((prev) => ({
             ...prev,
@@ -113,33 +133,52 @@ export function CreateVaultForm() {
 
   if (!isLoggedIn) {
     return (
-      <div className="text-center py-12 text-gray-500">
-        Please login to create a vault.
+      <div className="max-w-lg mx-auto text-center py-20">
+        <div className="glass-card p-12">
+          <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-accent/10 flex items-center justify-center">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-accent">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+          </div>
+          <p className="text-gray-400 font-body">
+            Please login to create a vault.
+          </p>
+        </div>
       </div>
     );
   }
 
   if (txDigest) {
     return (
-      <div className="max-w-lg mx-auto p-6 bg-gray-900 rounded-xl border border-gray-800">
-        <h2 className="text-lg font-bold text-green-400 mb-2">
-          Vault Created
-        </h2>
-        <p className="text-sm text-gray-400 mb-4">
-          Your vault has been created successfully.
-        </p>
-        <div className="bg-gray-950 p-3 rounded-lg">
-          <p className="text-xs text-gray-500 mb-1">Transaction Digest</p>
-          <p className="text-sm font-mono text-gray-300 break-all">
-            {txDigest}
+      <div className="max-w-lg mx-auto">
+        <div className="glass-card glow-border p-8">
+          <div className="w-12 h-12 mx-auto mb-5 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-emerald-400">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </div>
+          <h2 className="font-display font-bold text-xl text-white text-center mb-2">
+            Vault Created
+          </h2>
+          <p className="text-sm text-gray-400 text-center mb-6">
+            Your policy-controlled vault is now live on Sui Testnet.
           </p>
+          <div className="p-4 rounded-xl bg-void border border-vault-border">
+            <p className="text-[10px] font-mono text-gray-500 uppercase tracking-wider mb-1.5">
+              Transaction Digest
+            </p>
+            <p className="text-sm font-mono text-accent break-all">
+              {txDigest}
+            </p>
+          </div>
+          <button
+            onClick={() => setTxDigest(null)}
+            className="btn-primary w-full mt-6"
+          >
+            Create Another Vault
+          </button>
         </div>
-        <button
-          onClick={() => setTxDigest(null)}
-          className="mt-4 w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
-        >
-          Create Another
-        </button>
       </div>
     );
   }
@@ -147,117 +186,139 @@ export function CreateVaultForm() {
   return (
     <form
       onSubmit={handleSubmit}
-      className="max-w-lg mx-auto space-y-6 p-6 bg-gray-900 rounded-xl border border-gray-800"
+      className="max-w-lg mx-auto"
     >
-      <h2 className="text-lg font-bold text-white">Create New Vault</h2>
-
-      {/* Coin Selection */}
-      <div>
-        <label className="block text-sm text-gray-400 mb-1">
-          Select SUI Coin to Deposit
-        </label>
-        {isLoadingCoins ? (
-          <p className="text-sm text-gray-500">Loading coins...</p>
-        ) : coins.length === 0 ? (
-          <p className="text-sm text-red-400">
-            No SUI coins found. Please fund your account first.
+      <div className="glass-card p-8 space-y-6">
+        <div>
+          <h2 className="font-display font-bold text-xl text-white mb-1">
+            Create New Vault
+          </h2>
+          <p className="text-sm text-gray-500">
+            Configure policy guardrails for your AI agent.
           </p>
-        ) : (
-          <select
-            value={form.selectedCoinId}
-            onChange={(e) => updateField("selectedCoinId", e.target.value)}
-            className="w-full px-3 py-2 bg-gray-950 border border-gray-700 rounded-lg text-white focus:border-blue-500 focus:outline-none"
-          >
-            {coins.map((coin) => (
-              <option key={coin.objectId} value={coin.objectId}>
-                {mistToSui(coin.balance).toFixed(4)} SUI ({coin.objectId.slice(0, 8)}...{coin.objectId.slice(-4)})
-              </option>
-            ))}
-          </select>
-        )}
-        {selectedCoin && (
-          <p className="text-xs text-gray-500 mt-1">
-            This entire coin ({mistToSui(selectedCoin.balance).toFixed(4)} SUI) will be deposited into the vault.
+        </div>
+
+        {/* Coin Selection */}
+        <FormField label="Deposit Coin" hint={
+          selectedCoin
+            ? `This entire coin (${mistToSui(selectedCoin.balance).toFixed(4)} SUI) will be deposited.`
+            : undefined
+        }>
+          {isLoadingCoins ? (
+            <div className="vault-input flex items-center gap-2">
+              <span className="w-3 h-3 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
+              <span className="text-gray-500">Loading coins...</span>
+            </div>
+          ) : coins.length === 0 ? (
+            <div className="vault-input text-red-400 text-sm">
+              No SUI coins found. Please fund your account first.
+            </div>
+          ) : (
+            <select
+              value={form.selectedCoinId}
+              onChange={(e) => updateField("selectedCoinId", e.target.value)}
+              className="vault-input"
+            >
+              {coins.map((coin) => (
+                <option key={coin.objectId} value={coin.objectId}>
+                  {mistToSui(coin.balance).toFixed(4)} SUI ({coin.objectId.slice(0, 8)}...{coin.objectId.slice(-4)})
+                </option>
+              ))}
+            </select>
+          )}
+        </FormField>
+
+        <div className="grid grid-cols-2 gap-4">
+          <FormField label="Max Budget (SUI)">
+            <input
+              type="number"
+              step="0.01"
+              min="0.01"
+              value={form.maxBudget}
+              onChange={(e) => updateField("maxBudget", e.target.value)}
+              className="vault-input"
+            />
+          </FormField>
+          <FormField label="Max Per TX (SUI)">
+            <input
+              type="number"
+              step="0.01"
+              min="0.01"
+              value={form.maxPerTx}
+              onChange={(e) => updateField("maxPerTx", e.target.value)}
+              className="vault-input"
+            />
+          </FormField>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <FormField label="Cooldown (sec)">
+            <input
+              type="number"
+              min="0"
+              value={form.cooldownSeconds}
+              onChange={(e) => updateField("cooldownSeconds", e.target.value)}
+              className="vault-input"
+            />
+          </FormField>
+          <FormField label="Expires In (hours)">
+            <input
+              type="number"
+              min="1"
+              value={form.expiresInHours}
+              onChange={(e) => updateField("expiresInHours", e.target.value)}
+              className="vault-input"
+            />
+          </FormField>
+        </div>
+
+        {/* Allowed Actions */}
+        <div className="p-4 rounded-xl bg-void/50 border border-vault-border">
+          <p className="text-[10px] font-mono text-gray-500 uppercase tracking-wider mb-3">
+            Allowed Actions
           </p>
-        )}
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm text-gray-400 mb-1">
-            Max Budget (SUI)
+          <label className="flex items-center gap-3 cursor-pointer group">
+            <div className="relative">
+              <input
+                type="checkbox"
+                checked={form.allowSwap}
+                onChange={(e) => updateField("allowSwap", e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-5 h-5 rounded-md border border-vault-border bg-void peer-checked:bg-accent/20 peer-checked:border-accent/50 transition-all flex items-center justify-center">
+                {form.allowSwap && (
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" className="text-accent">
+                    <polyline points="10 3 4.5 8.5 2 6" />
+                  </svg>
+                )}
+              </div>
+            </div>
+            <div>
+              <p className="text-sm text-gray-300 group-hover:text-white transition-colors">
+                DeepBook Swap
+              </p>
+              <p className="text-[11px] text-gray-600">
+                Allow the agent to execute token swaps
+              </p>
+            </div>
           </label>
-          <input
-            type="number"
-            step="0.01"
-            min="0.01"
-            value={form.maxBudget}
-            onChange={(e) => updateField("maxBudget", e.target.value)}
-            className="w-full px-3 py-2 bg-gray-950 border border-gray-700 rounded-lg text-white focus:border-blue-500 focus:outline-none"
-          />
         </div>
-        <div>
-          <label className="block text-sm text-gray-400 mb-1">
-            Max Per TX (SUI)
-          </label>
-          <input
-            type="number"
-            step="0.01"
-            min="0.01"
-            value={form.maxPerTx}
-            onChange={(e) => updateField("maxPerTx", e.target.value)}
-            className="w-full px-3 py-2 bg-gray-950 border border-gray-700 rounded-lg text-white focus:border-blue-500 focus:outline-none"
-          />
-        </div>
-      </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm text-gray-400 mb-1">
-            Cooldown (seconds)
-          </label>
-          <input
-            type="number"
-            min="0"
-            value={form.cooldownSeconds}
-            onChange={(e) => updateField("cooldownSeconds", e.target.value)}
-            className="w-full px-3 py-2 bg-gray-950 border border-gray-700 rounded-lg text-white focus:border-blue-500 focus:outline-none"
-          />
-        </div>
-        <div>
-          <label className="block text-sm text-gray-400 mb-1">
-            Expires In (hours)
-          </label>
-          <input
-            type="number"
-            min="1"
-            value={form.expiresInHours}
-            onChange={(e) => updateField("expiresInHours", e.target.value)}
-            className="w-full px-3 py-2 bg-gray-950 border border-gray-700 rounded-lg text-white focus:border-blue-500 focus:outline-none"
-          />
-        </div>
+        <button
+          type="submit"
+          disabled={isSubmitting || coins.length === 0}
+          className="btn-primary w-full"
+        >
+          {isSubmitting ? (
+            <>
+              <span className="w-4 h-4 border-2 border-void/30 border-t-void rounded-full animate-spin" />
+              Creating Vault...
+            </>
+          ) : (
+            "Create Vault"
+          )}
+        </button>
       </div>
-
-      <div className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          id="allowSwap"
-          checked={form.allowSwap}
-          onChange={(e) => updateField("allowSwap", e.target.checked)}
-          className="rounded border-gray-600"
-        />
-        <label htmlFor="allowSwap" className="text-sm text-gray-400">
-          Allow Swap Actions
-        </label>
-      </div>
-
-      <button
-        type="submit"
-        disabled={isSubmitting || coins.length === 0}
-        className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 text-white font-medium rounded-lg transition-colors"
-      >
-        {isSubmitting ? "Creating..." : "Create Vault"}
-      </button>
     </form>
   );
 }

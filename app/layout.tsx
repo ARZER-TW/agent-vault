@@ -15,9 +15,9 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "AgentVault - Policy-Based AI Agent Wallet",
+  title: "AgentVault | Policy-Controlled AI Trading on Sui",
   description:
-    "Don't give your AI agent the keys. Give it a budget. Policy-based AI agent wallet on Sui.",
+    "Don't give your AI agent the keys. Give it a budget. Policy-enforced vaults for autonomous AI trading via DeepBook V3 on Sui.",
 };
 
 export default function RootLayout({
@@ -26,9 +26,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased relative`}
       >
         <Providers>{children}</Providers>
       </body>

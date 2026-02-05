@@ -3,52 +3,70 @@
 import { useVaultStore } from "@/lib/store/vault-store";
 import type { AgentRunResult } from "@/lib/agent/runtime";
 
-function LogEntry({ result }: { result: AgentRunResult }) {
+function LogEntry({ result, index }: { result: AgentRunResult; index: number }) {
   const { decision, policyCheck } = result;
 
-  const actionColor =
+  const actionConfig =
     decision.action === "hold"
-      ? "text-yellow-400"
+      ? { label: "HOLD", color: "text-amber", bg: "bg-amber/10", border: "border-amber/20" }
       : policyCheck.allowed
-        ? "text-green-400"
-        : "text-red-400";
-
-  const actionLabel =
-    decision.action === "hold"
-      ? "HOLD"
-      : decision.action === "swap_sui_to_usdc"
-        ? "SWAP SUI->USDC"
-        : "SWAP USDC->SUI";
+        ? { label: decision.action === "swap_sui_to_usdc" ? "SWAP SUI > USDC" : "SWAP USDC > SUI", color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/20" }
+        : { label: decision.action === "swap_sui_to_usdc" ? "SWAP SUI > USDC" : "SWAP USDC > SUI", color: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/20" };
 
   return (
-    <div className="p-4 bg-gray-900 border border-gray-800 rounded-lg">
-      <div className="flex items-center justify-between mb-2">
-        <span className={`text-sm font-bold ${actionColor}`}>
-          {actionLabel}
-        </span>
-        <span className="text-xs text-gray-500">
-          Confidence: {(decision.confidence * 100).toFixed(0)}%
-        </span>
+    <div className="p-4 rounded-xl bg-void/50 border border-vault-border hover:border-vault-border-hover transition-colors animate-fade-in-up">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-mono text-gray-600">
+            #{String(index + 1).padStart(2, "0")}
+          </span>
+          <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded-md ${actionConfig.bg} ${actionConfig.color} border ${actionConfig.border}`}>
+            {actionConfig.label}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-16 h-1.5 rounded-full bg-elevated overflow-hidden">
+            <div
+              className="h-full rounded-full bg-accent transition-all"
+              style={{ width: `${decision.confidence * 100}%` }}
+            />
+          </div>
+          <span className="text-[10px] font-mono text-gray-500">
+            {(decision.confidence * 100).toFixed(0)}%
+          </span>
+        </div>
       </div>
 
-      <p className="text-sm text-gray-400 mb-2">{decision.reasoning}</p>
+      <p className="text-sm text-gray-400 leading-relaxed mb-3">
+        {decision.reasoning}
+      </p>
 
       {decision.params && (
-        <div className="text-xs text-gray-500 mb-2">
-          Amount: {decision.params.amount} SUI
-          {decision.params.minOut && ` | Min Out: ${decision.params.minOut}`}
+        <div className="flex gap-3 text-[11px] font-mono text-gray-500 mb-3">
+          <span>Amount: {decision.params.amount} SUI</span>
+          {decision.params.minOut && (
+            <span>Min Out: {decision.params.minOut}</span>
+          )}
         </div>
       )}
 
       {!policyCheck.allowed && (
-        <div className="text-xs text-red-400/80 bg-red-900/20 px-2 py-1 rounded">
-          Blocked: {policyCheck.reason}
+        <div className="flex items-center gap-2 text-xs text-red-400 bg-red-500/5 border border-red-500/10 px-3 py-2 rounded-lg">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="15" y1="9" x2="9" y2="15" />
+            <line x1="9" y1="9" x2="15" y2="15" />
+          </svg>
+          <span>Blocked: {policyCheck.reason}</span>
         </div>
       )}
 
       {policyCheck.allowed && decision.action !== "hold" && (
-        <div className="text-xs text-green-400/80 bg-green-900/20 px-2 py-1 rounded">
-          Transaction built successfully
+        <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-500/5 border border-emerald-500/10 px-3 py-2 rounded-lg">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          <span>Transaction built successfully</span>
         </div>
       )}
     </div>
@@ -60,26 +78,42 @@ export function AgentActivityLog() {
 
   if (agentLogs.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-500 text-sm">
-        No agent activity yet. Start the agent to see decisions here.
+      <div className="terminal-log">
+        <div className="terminal-log-header">
+          <div className="terminal-dot bg-red-500/60" />
+          <div className="terminal-dot bg-amber/60" />
+          <div className="terminal-dot bg-emerald-500/60" />
+          <span className="ml-2 text-[10px] text-gray-500">agent-runtime</span>
+        </div>
+        <div className="p-6 text-center">
+          <p className="text-sm text-gray-500">
+            No agent activity yet.
+          </p>
+          <p className="text-xs text-gray-600 mt-1">
+            Run the agent to see AI trading decisions here.
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-bold text-gray-300">Agent Activity</h3>
+    <div className="terminal-log">
+      <div className="terminal-log-header">
+        <div className="terminal-dot bg-red-500/60" />
+        <div className="terminal-dot bg-amber/60" />
+        <div className="terminal-dot bg-emerald-500/60" />
+        <span className="ml-2 text-[10px] text-gray-500">agent-runtime</span>
         <button
           onClick={clearAgentLogs}
-          className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+          className="ml-auto text-[10px] text-gray-600 hover:text-gray-400 transition-colors font-mono"
         >
-          Clear
+          clear
         </button>
       </div>
-      <div className="space-y-3">
+      <div className="p-4 space-y-3">
         {agentLogs.map((log, i) => (
-          <LogEntry key={i} result={log} />
+          <LogEntry key={i} result={log} index={i} />
         ))}
       </div>
     </div>

@@ -11,6 +11,41 @@ import { runAgentCycle } from "@/lib/agent/runtime";
 import { mistToSui } from "@/lib/constants";
 import type { VaultData, AgentCapData } from "@/lib/vault/types";
 
+function StatCard({
+  label,
+  value,
+  unit,
+  accent,
+}: {
+  label: string;
+  value: string;
+  unit?: string;
+  accent?: boolean;
+}) {
+  return (
+    <div className="stat-card glass-card">
+      <p className="text-[10px] font-mono text-gray-500 uppercase tracking-wider mb-2">
+        {label}
+      </p>
+      <p className={`text-xl font-display font-bold ${accent ? "text-accent" : "text-white"}`}>
+        {value}
+        {unit && (
+          <span className="text-xs text-gray-500 ml-1 font-mono">{unit}</span>
+        )}
+      </p>
+    </div>
+  );
+}
+
+function PolicyRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between py-3 border-b border-vault-border last:border-0">
+      <span className="text-sm text-gray-500">{label}</span>
+      <span className="text-sm font-mono text-white">{value}</span>
+    </div>
+  );
+}
+
 export default function VaultDetailPage() {
   const params = useParams();
   const vaultId = params.id as string;
@@ -21,14 +56,12 @@ export default function VaultDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
 
-  // Fetch vault data and user's AgentCaps
   useEffect(() => {
     async function fetchData() {
       try {
         const vaultData = await getVault(vaultId);
         setVault(vaultData);
 
-        // If user is logged in, find their AgentCaps for this vault
         if (address) {
           const caps = await getAgentCaps(address);
           const vaultCaps = caps.filter((cap) => cap.vaultId === vaultId);
@@ -46,7 +79,6 @@ export default function VaultDetailPage() {
     if (vaultId) fetchData();
   }, [vaultId, address]);
 
-  // Find a valid AgentCap that is also authorized on the vault
   const activeAgentCap = agentCaps.find((cap) =>
     vault?.authorizedCaps.includes(cap.id),
   );
@@ -71,7 +103,6 @@ export default function VaultDetailPage() {
       });
       addAgentLog(result);
 
-      // Refresh vault data
       const updated = await getVault(vaultId);
       setVault(updated);
     } catch (error) {
@@ -83,51 +114,75 @@ export default function VaultDetailPage() {
     }
   }
 
+  const budgetSpentPct =
+    vault && vault.policy.maxBudget > 0n
+      ? Number((vault.totalSpent * 100n) / vault.policy.maxBudget)
+      : 0;
+
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="min-h-screen relative">
       <Header />
 
-      <main className="max-w-4xl mx-auto px-4 py-12">
+      <main className="max-w-5xl mx-auto px-6 py-12">
         {isLoading ? (
-          <div className="text-center py-16 text-gray-500">
-            Loading vault...
+          <div className="glass-card p-16 text-center">
+            <div className="w-8 h-8 mx-auto mb-4 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
+            <p className="text-gray-500">Loading vault...</p>
           </div>
         ) : !vault ? (
-          <div className="text-center py-16 text-gray-500">
-            Vault not found.
+          <div className="glass-card p-16 text-center">
+            <p className="text-gray-500">Vault not found.</p>
           </div>
         ) : (
-          <div className="space-y-8">
+          <div className="space-y-8 stagger-children">
             {/* Vault Header */}
-            <div className="flex items-start justify-between">
+            <div className="flex items-start justify-between animate-fade-in-up">
               <div>
-                <h1 className="text-2xl font-bold mb-1">Vault Details</h1>
-                <p className="text-sm font-mono text-gray-500">{vault.id}</p>
+                <p className="text-xs font-mono font-medium text-accent tracking-widest uppercase mb-2">
+                  Vault Detail
+                </p>
+                <h1 className="font-display font-bold text-3xl text-white mb-2">
+                  Vault Overview
+                </h1>
+                <p className="text-sm font-mono text-gray-500">
+                  {vault.id}
+                </p>
               </div>
               <span
-                className={`text-xs px-2 py-1 rounded-full ${
+                className={
                   Date.now() >= vault.policy.expiresAt
-                    ? "bg-red-900/30 text-red-400"
-                    : "bg-green-900/30 text-green-400"
-                }`}
+                    ? "badge-expired"
+                    : "badge-active"
+                }
               >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    Date.now() >= vault.policy.expiresAt
+                      ? "bg-red-400"
+                      : "bg-emerald-400"
+                  }`}
+                />
                 {Date.now() >= vault.policy.expiresAt ? "Expired" : "Active"}
               </span>
             </div>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in-up">
               <StatCard
                 label="Balance"
-                value={`${mistToSui(vault.balance).toFixed(4)} SUI`}
+                value={mistToSui(vault.balance).toFixed(4)}
+                unit="SUI"
+                accent
               />
               <StatCard
                 label="Total Spent"
-                value={`${mistToSui(vault.totalSpent).toFixed(4)} SUI`}
+                value={mistToSui(vault.totalSpent).toFixed(4)}
+                unit="SUI"
               />
               <StatCard
-                label="Remaining Budget"
-                value={`${mistToSui(vault.policy.maxBudget - vault.totalSpent).toFixed(4)} SUI`}
+                label="Budget Left"
+                value={mistToSui(vault.policy.maxBudget - vault.totalSpent).toFixed(4)}
+                unit="SUI"
               />
               <StatCard
                 label="Transactions"
@@ -135,66 +190,91 @@ export default function VaultDetailPage() {
               />
             </div>
 
+            {/* Budget usage bar */}
+            <div className="glass-card p-6 animate-fade-in-up">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-[10px] font-mono text-gray-500 uppercase tracking-wider">
+                  Budget Utilization
+                </p>
+                <span className={`text-sm font-mono font-bold ${budgetSpentPct > 80 ? "text-amber" : "text-accent"}`}>
+                  {budgetSpentPct}%
+                </span>
+              </div>
+              <div className="budget-bar">
+                <div
+                  className="budget-bar-fill"
+                  style={{ width: `${Math.min(budgetSpentPct, 100)}%` }}
+                />
+              </div>
+              <div className="flex justify-between mt-2 text-[10px] font-mono text-gray-600">
+                <span>0 SUI</span>
+                <span>{mistToSui(vault.policy.maxBudget).toFixed(2)} SUI</span>
+              </div>
+            </div>
+
             {/* Policy Details */}
-            <div className="p-6 bg-gray-900 rounded-xl border border-gray-800">
-              <h2 className="text-sm font-bold text-gray-300 mb-4">
+            <div className="glass-card p-6 animate-fade-in-up">
+              <h2 className="text-[10px] font-mono font-medium text-gray-500 uppercase tracking-wider mb-4">
                 Policy Configuration
               </h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                <div>
-                  <p className="text-gray-500 mb-1">Max Budget</p>
-                  <p className="text-white">
-                    {mistToSui(vault.policy.maxBudget).toFixed(4)} SUI
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-500 mb-1">Max Per TX</p>
-                  <p className="text-white">
-                    {mistToSui(vault.policy.maxPerTx).toFixed(4)} SUI
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-500 mb-1">Cooldown</p>
-                  <p className="text-white">
-                    {vault.policy.cooldownMs / 1000}s
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-500 mb-1">Expires</p>
-                  <p className="text-white">
-                    {new Date(vault.policy.expiresAt).toLocaleString()}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-500 mb-1">Allowed Actions</p>
-                  <p className="text-white">
-                    {vault.policy.allowedActions.join(", ") || "None"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-500 mb-1">Authorized Agents</p>
-                  <p className="text-white">{vault.authorizedCaps.length}</p>
-                </div>
+              <div className="divide-y divide-vault-border">
+                <PolicyRow
+                  label="Max Budget"
+                  value={`${mistToSui(vault.policy.maxBudget).toFixed(4)} SUI`}
+                />
+                <PolicyRow
+                  label="Max Per TX"
+                  value={`${mistToSui(vault.policy.maxPerTx).toFixed(4)} SUI`}
+                />
+                <PolicyRow
+                  label="Cooldown"
+                  value={`${vault.policy.cooldownMs / 1000}s`}
+                />
+                <PolicyRow
+                  label="Expires"
+                  value={new Date(vault.policy.expiresAt).toLocaleString()}
+                />
+                <PolicyRow
+                  label="Allowed Actions"
+                  value={vault.policy.allowedActions.length > 0
+                    ? vault.policy.allowedActions.map((a) => a === 0 ? "Swap" : `Action ${a}`).join(", ")
+                    : "None"}
+                />
+                <PolicyRow
+                  label="Authorized Agents"
+                  value={String(vault.authorizedCaps.length)}
+                />
               </div>
             </div>
 
             {/* Agent Controls */}
-            <div className="p-6 bg-gray-900 rounded-xl border border-gray-800">
-              <div className="flex items-center justify-between mb-4">
+            <div className="glass-card p-6 animate-fade-in-up">
+              <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h2 className="text-sm font-bold text-gray-300">AI Agent</h2>
+                  <h2 className="text-[10px] font-mono font-medium text-gray-500 uppercase tracking-wider mb-2">
+                    AI Agent Runtime
+                  </h2>
                   {activeAgentCap ? (
-                    <p className="text-xs text-green-400 mt-1">
-                      AgentCap: {activeAgentCap.id.slice(0, 10)}...
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                      <span className="text-xs font-mono text-emerald-400">
+                        AgentCap: {activeAgentCap.id.slice(0, 10)}...
+                      </span>
+                    </div>
                   ) : address ? (
-                    <p className="text-xs text-yellow-400 mt-1">
-                      No authorized AgentCap found for your address
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-amber" />
+                      <span className="text-xs text-amber">
+                        No authorized AgentCap found
+                      </span>
+                    </div>
                   ) : (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Login to run the agent
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-gray-600" />
+                      <span className="text-xs text-gray-500">
+                        Login to run the agent
+                      </span>
+                    </div>
                   )}
                 </div>
                 <button
@@ -204,9 +284,21 @@ export default function VaultDetailPage() {
                     !activeAgentCap ||
                     Date.now() >= vault.policy.expiresAt
                   }
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 text-white text-sm font-medium rounded-lg transition-colors"
+                  className="btn-primary"
                 >
-                  {isRunning ? "Running..." : "Run Agent Cycle"}
+                  {isRunning ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-void/30 border-t-void rounded-full animate-spin" />
+                      Running...
+                    </>
+                  ) : (
+                    <>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <polygon points="5 3 19 12 5 21 5 3" />
+                      </svg>
+                      Run Agent Cycle
+                    </>
+                  )}
                 </button>
               </div>
               <AgentActivityLog />
@@ -214,15 +306,6 @@ export default function VaultDetailPage() {
           </div>
         )}
       </main>
-    </div>
-  );
-}
-
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="p-4 bg-gray-900 rounded-xl border border-gray-800">
-      <p className="text-xs text-gray-500 mb-1">{label}</p>
-      <p className="text-lg font-bold text-white">{value}</p>
     </div>
   );
 }
