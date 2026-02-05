@@ -193,16 +193,16 @@ module agent_vault::agent_vault {
         // 3. Check expiry
         assert!(now < vault.policy.expires_at, E_EXPIRED);
 
-        // 4. Check cooldown (skip for first tx where last_tx_time is 0)
-        if (vault.last_tx_time > 0) {
-            assert!(now >= vault.last_tx_time + vault.policy.cooldown_ms, E_COOLDOWN);
+        // 4. Check cooldown (skip for first tx)
+        if (vault.tx_count > 0) {
+            assert!(now - vault.last_tx_time >= vault.policy.cooldown_ms, E_COOLDOWN);
         };
 
         // 5. Check per-tx limit
         assert!(amount <= vault.policy.max_per_tx, E_PER_TX_EXCEEDED);
 
-        // 6. Check total budget
-        assert!(vault.total_spent + amount <= vault.policy.max_budget, E_BUDGET_EXCEEDED);
+        // 6. Check total budget (subtraction avoids overflow)
+        assert!(amount <= vault.policy.max_budget - vault.total_spent, E_BUDGET_EXCEEDED);
 
         // 7. Check action whitelist
         assert!(vault.policy.allowed_actions.contains(&action_type), E_NOT_WHITELISTED);
