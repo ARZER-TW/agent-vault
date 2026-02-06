@@ -54,6 +54,8 @@ export default function VaultDetailPage() {
   const [agentCaps, setAgentCaps] = useState<AgentCapData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
+  const [isDemoMode, setIsDemoMode] = useState(false);
+  const [demoAmount, setDemoAmount] = useState("");
 
   useEffect(() => {
     async function fetchData() {
@@ -117,6 +119,40 @@ export default function VaultDetailPage() {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Agent run failed";
+      alert(message);
+    } finally {
+      setIsRunning(false);
+    }
+  }
+
+  async function handleDemoRun(forceAmount: number) {
+    if (!vault || !activeAgentCap) return;
+
+    setIsRunning(true);
+    try {
+      const response = await fetch("/api/agent/demo-run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          vaultId: vault.id,
+          agentCapId: activeAgentCap.id,
+          ownerAddress: vault.owner,
+          forceAmount,
+        }),
+      });
+
+      const json = await response.json();
+      if (!json.success) {
+        throw new Error(json.error || "Demo run failed");
+      }
+
+      addAgentLog(json.data);
+
+      const updated = await getVault(vaultId);
+      setVault(updated);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Demo run failed";
       alert(message);
     } finally {
       setIsRunning(false);
@@ -310,6 +346,73 @@ export default function VaultDetailPage() {
                   )}
                 </button>
               </div>
+              {/* Demo Mode Panel */}
+              <div className="mb-4 p-4 rounded-xl border border-vault-border bg-void/30">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono text-gray-500 uppercase tracking-wider">
+                      Demo Mode
+                    </span>
+                    <span className="text-[10px] font-mono text-gray-600">
+                      (skip Claude, test policy directly)
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setIsDemoMode(!isDemoMode)}
+                    className={`relative w-10 h-5 rounded-full transition-colors ${isDemoMode ? "bg-accent" : "bg-elevated"}`}
+                  >
+                    <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${isDemoMode ? "left-5.5 translate-x-0" : "left-0.5"}`} style={{ left: isDemoMode ? "22px" : "2px" }} />
+                  </button>
+                </div>
+
+                {isDemoMode && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        value={demoAmount}
+                        onChange={(e) => setDemoAmount(e.target.value)}
+                        placeholder="Amount in SUI"
+                        step="0.01"
+                        min="0"
+                        className="vault-input text-sm flex-1"
+                      />
+                      <button
+                        onClick={() => handleDemoRun(parseFloat(demoAmount || "0"))}
+                        disabled={isRunning || !demoAmount || parseFloat(demoAmount) <= 0 || !activeAgentCap}
+                        className="btn-primary text-sm"
+                      >
+                        {isRunning ? "Running..." : "Test"}
+                      </button>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          const overLimit = vault ? mistToSui(vault.policy.maxPerTx) * 2 : 5;
+                          setDemoAmount(String(overLimit));
+                          handleDemoRun(overLimit);
+                        }}
+                        disabled={isRunning || !activeAgentCap}
+                        className="flex-1 px-3 py-2 rounded-lg text-xs font-mono bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                      >
+                        Test Over-Limit
+                      </button>
+                      <button
+                        onClick={() => {
+                          const normal = vault ? mistToSui(vault.policy.maxPerTx) * 0.5 : 0.1;
+                          setDemoAmount(String(normal));
+                          handleDemoRun(normal);
+                        }}
+                        disabled={isRunning || !activeAgentCap}
+                        className="flex-1 px-3 py-2 rounded-lg text-xs font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
+                      >
+                        Test Normal
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <AgentActivityLog />
             </div>
           </div>
