@@ -75,7 +75,7 @@ Your AI agent receives an **AgentCap** (transferable NFT permission token) that 
 | State       | Zustand + React Query                   | zustand@5, @tanstack/react-query@5 |
 | Sui SDK     | @mysten/sui, @mysten/zklogin            | @mysten/sui@1.38.0                 |
 | DeepBook    | @mysten/deepbook-v3                     | v0.17.0                            |
-| AI          | Anthropic Claude API                    | claude-sonnet-4-20250514               |
+| AI          | OpenAI / Gemini / Claude (auto-detect)  | gpt-4o, gemini-2.0-flash, claude-sonnet-4-20250514 |
 | Contracts   | Sui Move                                | edition 2024.beta, Sui Testnet     |
 | Validation  | Zod                                     | zod@3.24.0                         |
 | Testing     | Vitest + sui move test                  | vitest@3.0.0                       |
@@ -257,7 +257,9 @@ NEXT_PUBLIC_GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=your-client-secret
 NEXT_PUBLIC_REDIRECT_URI=http://localhost:3000/auth/callback
 
-# Claude API
+# LLM API (set ONE -- auto-detects provider)
+OPENAI_API_KEY=sk-xxx          # or
+GEMINI_API_KEY=xxx             # or
 ANTHROPIC_API_KEY=sk-ant-xxx
 
 # Sponsor Wallet (pays gas for users)

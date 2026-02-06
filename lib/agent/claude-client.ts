@@ -1,10 +1,18 @@
 import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { VaultData } from "@/lib/vault/types";
 import type { OrderBookSnapshot } from "@/lib/sui/market";
 import { mistToSui } from "@/lib/constants";
 import { parseAgentDecision, type AgentDecision } from "./intent-parser";
 
-const MODEL = "claude-sonnet-4-20250514";
+type LLMProvider = "anthropic" | "openai" | "gemini";
+
+const MODELS: Record<LLMProvider, string> = {
+  anthropic: "claude-sonnet-4-20250514",
+  openai: "gpt-4o",
+  gemini: "gemini-2.0-flash",
+};
 
 const SYSTEM_PROMPT = `You are an AI trading agent managing a Sui blockchain vault.
 Your job is to analyze market conditions and make trading decisions within your policy constraints.
@@ -51,44 +59,98 @@ Market Data (SUI/DBUSDC):
 What trading action should I take?`;
 }
 
-let anthropicClient: Anthropic | null = null;
+/**
+ * Detect which LLM provider to use based on available API keys.
+ * Priority: OPENAI > GEMINI > ANTHROPIC (check in order, use first available).
+ * Override with LLM_PROVIDER env var to force a specific provider.
+ */
+function detectProvider(): LLMProvider {
+  const forced = process.env.LLM_PROVIDER as LLMProvider | undefined;
+  if (forced && MODELS[forced]) return forced;
 
-function getAnthropicClient(): Anthropic {
-  if (!anthropicClient) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      throw new Error("ANTHROPIC_API_KEY environment variable is not set");
-    }
-    anthropicClient = new Anthropic({ apiKey });
-  }
-  return anthropicClient;
+  if (process.env.OPENAI_API_KEY) return "openai";
+  if (process.env.GEMINI_API_KEY) return "gemini";
+  if (process.env.ANTHROPIC_API_KEY) return "anthropic";
+
+  throw new Error(
+    "No LLM API key found. Set one of: OPENAI_API_KEY, GEMINI_API_KEY, ANTHROPIC_API_KEY",
+  );
 }
 
+// -- Provider-specific call functions --
+
+async function callAnthropic(userPrompt: string): Promise<string> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set");
+
+  const client = new Anthropic({ apiKey });
+  const response = await client.messages.create({
+    model: MODELS.anthropic,
+    max_tokens: 512,
+    system: SYSTEM_PROMPT,
+    messages: [{ role: "user", content: userPrompt }],
+  });
+
+  const textBlock = response.content.find((block) => block.type === "text");
+  if (!textBlock || textBlock.type !== "text") {
+    throw new Error("No text content in Anthropic response");
+  }
+  return textBlock.text;
+}
+
+async function callOpenAI(userPrompt: string): Promise<string> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("OPENAI_API_KEY is not set");
+
+  const client = new OpenAI({ apiKey });
+  const response = await client.chat.completions.create({
+    model: MODELS.openai,
+    max_tokens: 512,
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: userPrompt },
+    ],
+  });
+
+  const text = response.choices[0]?.message?.content;
+  if (!text) throw new Error("No text content in OpenAI response");
+  return text;
+}
+
+async function callGemini(userPrompt: string): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY is not set");
+
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({
+    model: MODELS.gemini,
+    systemInstruction: SYSTEM_PROMPT,
+  });
+
+  const result = await model.generateContent(userPrompt);
+  const text = result.response.text();
+  if (!text) throw new Error("No text content in Gemini response");
+  return text;
+}
+
+const PROVIDER_CALLERS: Record<LLMProvider, (prompt: string) => Promise<string>> = {
+  anthropic: callAnthropic,
+  openai: callOpenAI,
+  gemini: callGemini,
+};
+
 /**
- * Ask Claude for a trading decision based on vault state and market data.
+ * Get a trading decision from the configured LLM provider.
+ * Auto-detects provider from env vars, or use LLM_PROVIDER to force one.
  */
 export async function getAgentDecision(params: {
   vault: VaultData;
   orderBook: OrderBookSnapshot;
 }): Promise<AgentDecision> {
-  const client = getAnthropicClient();
+  const provider = detectProvider();
+  const caller = PROVIDER_CALLERS[provider];
+  const userPrompt = buildUserPrompt(params);
 
-  const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: 512,
-    system: SYSTEM_PROMPT,
-    messages: [
-      {
-        role: "user",
-        content: buildUserPrompt(params),
-      },
-    ],
-  });
-
-  const textBlock = response.content.find((block) => block.type === "text");
-  if (!textBlock || textBlock.type !== "text") {
-    throw new Error("No text content in Claude response");
-  }
-
-  return parseAgentDecision(textBlock.text);
+  const rawText = await caller(userPrompt);
+  return parseAgentDecision(rawText);
 }
