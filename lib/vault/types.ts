@@ -48,6 +48,8 @@ export interface AgentLogEntry {
     reason: string;
   };
   hasTransaction?: boolean;
+  txDigest?: string | null;
+  timestamp?: number;
 }
 
 export interface AgentIntent {

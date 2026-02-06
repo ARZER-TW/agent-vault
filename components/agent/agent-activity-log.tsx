@@ -3,6 +3,8 @@
 import { useVaultStore } from "@/lib/store/vault-store";
 import type { AgentLogEntry } from "@/lib/vault/types";
 
+const EXPLORER_BASE = "https://suiscan.xyz/testnet/tx";
+
 function LogEntry({ result, index }: { result: AgentLogEntry; index: number }) {
   const { decision, policyCheck } = result;
 
@@ -23,6 +25,11 @@ function LogEntry({ result, index }: { result: AgentLogEntry; index: number }) {
           <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded-md ${actionConfig.bg} ${actionConfig.color} border ${actionConfig.border}`}>
             {actionConfig.label}
           </span>
+          {result.timestamp && (
+            <span className="text-[10px] font-mono text-gray-600">
+              {new Date(result.timestamp).toLocaleTimeString()}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-16 h-1.5 rounded-full bg-elevated overflow-hidden">
@@ -62,11 +69,27 @@ function LogEntry({ result, index }: { result: AgentLogEntry; index: number }) {
       )}
 
       {policyCheck.allowed && decision.action !== "hold" && (
-        <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-500/5 border border-emerald-500/10 px-3 py-2 rounded-lg">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-          <span>Transaction built successfully</span>
+        <div className="flex items-center justify-between text-xs text-emerald-400 bg-emerald-500/5 border border-emerald-500/10 px-3 py-2 rounded-lg">
+          <div className="flex items-center gap-2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            <span>
+              {result.txDigest
+                ? `TX: ${result.txDigest.slice(0, 16)}...`
+                : "Transaction executed"}
+            </span>
+          </div>
+          {result.txDigest && (
+            <a
+              href={`${EXPLORER_BASE}/${result.txDigest}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-accent hover:text-white transition-colors font-mono underline"
+            >
+              View on Explorer
+            </a>
+          )}
         </div>
       )}
     </div>

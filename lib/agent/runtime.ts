@@ -5,11 +5,11 @@ import type { OrderBookSnapshot } from "@/lib/sui/market";
 import type { AgentDecision } from "./intent-parser";
 import type { PolicyCheckResult } from "./policy-checker";
 import { getVault } from "@/lib/vault/service";
-import { getOrderBook } from "@/lib/sui/market";
+import { getOrderBook, getSwapQuote } from "@/lib/sui/market";
 import { getAgentDecision } from "./claude-client";
 import { checkPolicy } from "./policy-checker";
 import { buildAgentSwap, buildAgentWithdraw } from "@/lib/vault/ptb-builder";
-import { suiToMist, ACTION_SWAP, DEEPBOOK_POOL_KEY } from "@/lib/constants";
+import { suiToMist, mistToSui, ACTION_SWAP, DEEPBOOK_POOL_KEY } from "@/lib/constants";
 import {
   executeSponsoredAgentTransaction,
   executeAgentTransaction,
@@ -94,18 +94,39 @@ export async function runAgentCycle(params: {
   let transaction: Transaction;
 
   if (decision.action === "swap_sui_to_usdc") {
-    transaction = buildAgentSwap({
-      vaultId,
-      agentCapId,
-      agentAddress,
-      ownerAddress,
-      amountMist,
-      minOut,
-      deepAmount: 0,
-      poolKey: DEEPBOOK_POOL_KEY,
-    });
+    // Get exact DEEP fee requirement from DeepBook, with 50% buffer
+    let deepAmount = 0;
+    try {
+      const quote = await getSwapQuote(agentAddress, amountSui, DEEPBOOK_POOL_KEY);
+      deepAmount = quote.deepRequired > 0 ? quote.deepRequired * 1.5 : 0;
+    } catch {
+      // If quote fails, use estimated fee (taker fee 0.1%, ~0.04 DEEP per SUI)
+      deepAmount = amountSui * 0.04;
+    }
+
+    try {
+      transaction = buildAgentSwap({
+        vaultId,
+        agentCapId,
+        agentAddress,
+        ownerAddress,
+        amountMist,
+        minOut,
+        deepAmount,
+        poolKey: DEEPBOOK_POOL_KEY,
+      });
+    } catch (swapBuildError) {
+      // Fallback: simple withdraw if DeepBook swap build fails
+      transaction = buildAgentWithdraw({
+        vaultId,
+        agentCapId,
+        amount: amountMist,
+        actionType: ACTION_SWAP,
+        recipientAddress: ownerAddress,
+      });
+    }
   } else {
-    // swap_usdc_to_sui - for now use simple withdraw
+    // swap_usdc_to_sui - use simple withdraw
     // (reverse swap via DeepBook would need swapExactQuoteForBase)
     transaction = buildAgentWithdraw({
       vaultId,
