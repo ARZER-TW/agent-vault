@@ -59,7 +59,10 @@ Your AI agent receives an **AgentCap** (transferable NFT permission token) that 
 5. **Claude** returns structured `AgentDecision` (action + reasoning + confidence)
 6. **Policy Checker** validates the intent off-chain (pre-flight, saves gas)
 7. **PTB Builder** composes atomic transaction: `agent_withdraw -> DeepBook swap`
-8. **Sponsored TX** executes -- user and agent pay zero gas
+8. **Sponsored TX** executes on-chain -- user and agent pay zero gas
+9. **UI** displays TX hash with Sui Explorer link for on-chain verification
+
+**Demo Mode**: Skip step 3-5, inject forced amount to demonstrate policy enforcement directly (over-limit blocked, normal amount passes).
 
 ---
 
@@ -77,15 +80,83 @@ Your AI agent receives an **AgentCap** (transferable NFT permission token) that 
 | Validation  | Zod                                     | zod@3.24.0                         |
 | Testing     | Vitest + sui move test                  | vitest@3.0.0                       |
 
-## Why Sui?
+## Why Sui? (And Why This Can't Be Built on EVM)
 
-| Sui Feature          | How AgentVault Uses It                               | Why Other Chains Can't                       |
+AgentVault is **not** a project that happens to be on Sui -- it is fundamentally enabled by five Sui-specific features that have no equivalent on EVM chains:
+
+### 1. Object Capabilities (AgentCap as a First-Class Permission Object)
+
+On Sui, capabilities are **objects with identity**. AgentCap is an owned object (`key, store`) that the contract verifies at the Move level:
+
+```move
+// Move: AgentCap is a real object -- can be transferred, revoked, checked at compile time
+public struct AgentCap has key, store {
+    id: UID,
+    vault_id: ID,
+}
+```
+
+On EVM, `approve(spender, amount)` only controls **how much**, not **what actions**, **how often**, or **when it expires**. AgentVault enforces 5 policy dimensions (budget, per-tx limit, action whitelist, cooldown, expiry) in a single atomic check. ERC-20 approve cannot express this.
+
+### 2. Programmable Transaction Blocks (PTB)
+
+One AgentVault transaction atomically composes:
+
+```
+agent_withdraw(vault, cap, amount) -> Coin<SUI>
+  -> deepbook::swap(coin) -> [baseOut, quoteOut, deepOut]
+  -> transferObjects([results], owner)
+```
+
+This is **one transaction, one signature, one gas fee**. On EVM, this would require:
+- TX 1: `approve()` the DEX contract
+- TX 2: `swap()` on the DEX
+- TX 3: Transfer results back
+
+Three transactions = three gas fees, three failure points, and a race condition window between TX 1 and TX 2 where funds are exposed.
+
+### 3. zkLogin (Google Login = Sui Address)
+
+AgentVault users sign in with Google. No MetaMask. No seed phrase. No wallet extension.
+
+```
+Google OAuth JWT -> ZK Proof -> Sui Address -> Sign Transactions
+```
+
+zkLogin is native to Sui's validator set -- the proof is verified on-chain by validators, not by a smart contract. This means zero extra gas cost for ZK verification, unlike EVM's ERC-4337 account abstraction which adds ~200k gas overhead per UserOp.
+
+### 4. Sponsored Transactions (Zero Gas for Users AND Agents)
+
+Both the vault owner and the AI agent pay **zero gas**. A separate sponsor keypair covers gas for all operations:
+
+```typescript
+transaction.setSender(agentAddress);      // Agent signs the action
+transaction.setGasOwner(sponsorAddress);  // Sponsor pays gas
+// Two signatures, one transaction -- native protocol support
+```
+
+On EVM, meta-transactions require a Relayer contract, EIP-712 signatures, and a trusted off-chain relayer service. Sui's sponsored TX is a protocol-level primitive with no extra contracts needed.
+
+### 5. Move Linear Type Safety
+
+AgentCap **cannot be copied** -- this is enforced by the Move compiler, not by runtime checks:
+
+```move
+// Move compiler REJECTS this: AgentCap has no `copy` ability
+let cap2 = cap; // ERROR: cannot copy AgentCap
+```
+
+In Solidity, access control relies on `require(msg.sender == owner)` -- a runtime check that can be bypassed by delegate calls, proxy upgrades, or reentrancy. Move's type system eliminates entire classes of vulnerabilities at compile time.
+
+### Summary Table
+
+| Sui Feature          | How AgentVault Uses It                               | EVM Equivalent (And Why It Falls Short)      |
 |----------------------|------------------------------------------------------|----------------------------------------------|
-| Object Capabilities  | AgentCap as transferable/revocable permission NFT    | EVM approve() lacks fine-grained control     |
-| PTB                  | Atomic: policy check + withdraw + swap in one tx     | EVM needs multiple transactions              |
-| zkLogin              | Google login, no wallet extension needed             | Not native on other chains                   |
-| Sponsored TX         | Users and agents pay zero gas                        | Meta-tx on EVM is complex and fragile        |
-| Move Type Safety     | AgentCap can't be copied or forged (linear types)    | Solidity modifiers can be bypassed           |
+| Object Capabilities  | AgentCap = 5-dimensional policy-controlled permission | `approve()` = amount-only, no action/time control |
+| PTB                  | withdraw + swap + transfer in one atomic TX          | 3 separate TXs with race conditions          |
+| zkLogin              | Google login, native ZK proof on validators          | ERC-4337 adds ~200k gas per operation        |
+| Sponsored TX         | Protocol-level gas sponsorship, 2 sigs, 0 contracts | Requires Relayer contract + off-chain infra  |
+| Move Linear Types    | AgentCap can't be copied (compiler enforced)         | Solidity modifiers are runtime-only checks   |
 
 ---
 
@@ -118,7 +189,7 @@ agent-vault/
 |   |   +-- market.ts               # Order book snapshots, swap quotes, pool info
 |   |   +-- coins.ts                # Fetch SUI coin objects by owner
 |   +-- agent/
-|   |   +-- runtime.ts              # Agent cycle orchestrator (6-step pipeline)
+|   |   +-- runtime.ts              # Agent cycle orchestrator (7-step pipeline)
 |   |   +-- claude-client.ts        # Claude API wrapper with system prompt
 |   |   +-- intent-parser.ts        # Zod-validated AgentDecision parsing
 |   |   +-- policy-checker.ts       # Off-chain policy pre-validation
@@ -305,10 +376,11 @@ The frontend uses the **Vault Noir** design system:
 
 ### API Routes
 
-| Route                  | Method | Description                                |
-|------------------------|--------|--------------------------------------------|
-| `/api/agent/run`       | POST   | Execute one agent cycle (market -> Claude -> policy -> PTB) |
-| `/api/vault/[id]`      | GET    | Fetch vault data from chain                |
+| Route                  | Method | Description                                         |
+|------------------------|--------|-----------------------------------------------------|
+| `/api/agent/run`       | POST   | Execute one agent cycle (market -> Claude -> policy -> TX) |
+| `/api/agent/demo-run`  | POST   | Demo mode: skip Claude, test policy with forced amount    |
+| `/api/vault/[id]`      | GET    | Fetch vault data from chain                         |
 
 ---
 
@@ -327,12 +399,14 @@ The frontend uses the **Vault Noir** design system:
 |-------------------------|--------------------|--------------------------------|
 | Move Contracts          | Deployed (Testnet) | 15/15 tests passing            |
 | PTB Builder             | Complete           | 7 transaction builders         |
-| DeepBook V3 Integration | Complete           | Order book + swap + quotes     |
-| Agent Runtime           | Complete           | 6-step pipeline with Claude    |
+| DeepBook V3 Integration | Complete           | Order book + swap + quotes + fallback |
+| Agent Runtime           | Complete           | 7-step pipeline (market -> Claude -> policy -> TX execution) |
 | Policy Checker          | Complete           | 6 off-chain validation rules   |
 | Intent Parser           | Complete           | Zod-validated + code block extraction |
 | zkLogin                 | Complete           | Google OAuth + ZK prover       |
-| Sponsored TX            | Complete           | Zero gas for users and agents  |
+| Sponsored TX            | Complete           | Dual-signature: agent signs action, sponsor pays gas |
+| On-chain TX Execution   | Complete           | Sponsored TX with direct fallback |
+| Demo Mode               | Complete           | Forced-amount policy testing (skip Claude) |
 | Frontend                | Complete           | Vault Noir design, all pages   |
 | Unit Tests              | 20/20 passing      | Vitest (intent-parser + policy-checker) |
 | Contract Tests          | 15/15 passing      | sui move test                  |
