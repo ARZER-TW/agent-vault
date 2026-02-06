@@ -7,7 +7,6 @@ import { AgentActivityLog } from "@/components/agent/agent-activity-log";
 import { useAuthStore } from "@/lib/store/auth-store";
 import { useVaultStore } from "@/lib/store/vault-store";
 import { getVault, getAgentCaps } from "@/lib/vault/service";
-import { runAgentCycle } from "@/lib/agent/runtime";
 import { mistToSui } from "@/lib/constants";
 import type { VaultData, AgentCapData } from "@/lib/vault/types";
 
@@ -95,13 +94,23 @@ export default function VaultDetailPage() {
 
     setIsRunning(true);
     try {
-      const result = await runAgentCycle({
-        vaultId: vault.id,
-        agentCapId: activeAgentCap.id,
-        agentAddress: address,
-        ownerAddress: vault.owner,
+      const response = await fetch("/api/agent/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          vaultId: vault.id,
+          agentCapId: activeAgentCap.id,
+          agentAddress: address,
+          ownerAddress: vault.owner,
+        }),
       });
-      addAgentLog(result);
+
+      const json = await response.json();
+      if (!json.success) {
+        throw new Error(json.error || "Agent run failed");
+      }
+
+      addAgentLog(json.data);
 
       const updated = await getVault(vaultId);
       setVault(updated);

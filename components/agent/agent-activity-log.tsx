@@ -1,9 +1,9 @@
 "use client";
 
 import { useVaultStore } from "@/lib/store/vault-store";
-import type { AgentRunResult } from "@/lib/agent/runtime";
+import type { AgentLogEntry } from "@/lib/vault/types";
 
-function LogEntry({ result, index }: { result: AgentRunResult; index: number }) {
+function LogEntry({ result, index }: { result: AgentLogEntry; index: number }) {
   const { decision, policyCheck } = result;
 
   const actionConfig =

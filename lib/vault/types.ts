@@ -29,6 +29,27 @@ export interface OwnerCapData {
 
 export type ActionType = "swap" | "limit_order";
 
+/**
+ * Client-safe log entry for agent activity display.
+ * Matches the shape returned by /api/agent/run (JSON-serializable, no server-only types).
+ */
+export interface AgentLogEntry {
+  decision: {
+    action: "swap_sui_to_usdc" | "swap_usdc_to_sui" | "hold";
+    reasoning: string;
+    confidence: number;
+    params?: {
+      amount: string;
+      minOut?: string;
+    };
+  };
+  policyCheck: {
+    allowed: boolean;
+    reason: string;
+  };
+  hasTransaction?: boolean;
+}
+
 export interface AgentIntent {
   action: "swap_sui_to_usdc" | "swap_usdc_to_sui" | "hold";
   amount: number;

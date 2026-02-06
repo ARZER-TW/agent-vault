@@ -1,19 +1,18 @@
 import { create } from "zustand";
-import type { VaultData, OwnerCapData, AgentCapData } from "@/lib/vault/types";
-import type { AgentRunResult } from "@/lib/agent/runtime";
+import type { VaultData, OwnerCapData, AgentCapData, AgentLogEntry } from "@/lib/vault/types";
 
 interface VaultState {
   vaults: VaultData[];
   ownerCaps: OwnerCapData[];
   agentCaps: AgentCapData[];
   selectedVaultId: string | null;
-  agentLogs: AgentRunResult[];
+  agentLogs: AgentLogEntry[];
   isLoading: boolean;
   setVaults: (vaults: VaultData[]) => void;
   setOwnerCaps: (caps: OwnerCapData[]) => void;
   setAgentCaps: (caps: AgentCapData[]) => void;
   selectVault: (id: string | null) => void;
-  addAgentLog: (log: AgentRunResult) => void;
+  addAgentLog: (log: AgentLogEntry) => void;
   clearAgentLogs: () => void;
   setLoading: (loading: boolean) => void;
 }
