@@ -1,4 +1,5 @@
 import type { Transaction } from "@mysten/sui/transactions";
+import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import type { VaultData } from "@/lib/vault/types";
 import type { OrderBookSnapshot } from "@/lib/sui/market";
 import type { AgentDecision } from "./intent-parser";
@@ -9,11 +10,16 @@ import { getAgentDecision } from "./claude-client";
 import { checkPolicy } from "./policy-checker";
 import { buildAgentSwap, buildAgentWithdraw } from "@/lib/vault/ptb-builder";
 import { suiToMist, ACTION_SWAP, DEEPBOOK_POOL_KEY } from "@/lib/constants";
+import {
+  executeSponsoredAgentTransaction,
+  executeAgentTransaction,
+} from "@/lib/auth/sponsored-tx";
 
 export interface AgentRunResult {
   decision: AgentDecision;
   policyCheck: PolicyCheckResult;
   transaction: Transaction | null;
+  txDigest: string | null;
   vault: VaultData;
   orderBook: OrderBookSnapshot;
 }
@@ -25,6 +31,7 @@ export interface AgentRunResult {
  * 3. Ask Claude for decision
  * 4. Validate against policy
  * 5. Build PTB if allowed
+ * 6. Execute transaction on-chain
  */
 export async function runAgentCycle(params: {
   vaultId: string;
@@ -49,6 +56,7 @@ export async function runAgentCycle(params: {
       decision,
       policyCheck: { allowed: true, reason: "Hold action - no transaction needed" },
       transaction: null,
+      txDigest: null,
       vault,
       orderBook,
     };
@@ -70,6 +78,7 @@ export async function runAgentCycle(params: {
       decision,
       policyCheck,
       transaction: null,
+      txDigest: null,
       vault,
       orderBook,
     };
@@ -107,10 +116,41 @@ export async function runAgentCycle(params: {
     });
   }
 
+  // Step 7: Execute transaction on-chain
+  const agentKeyStr = process.env.AGENT_PRIVATE_KEY;
+  if (!agentKeyStr) {
+    throw new Error("AGENT_PRIVATE_KEY is not set");
+  }
+  const agentKeypair = Ed25519Keypair.fromSecretKey(agentKeyStr);
+
+  let txDigest: string;
+  try {
+    // Try sponsored execution first (agent may not have SUI for gas)
+    txDigest = await executeSponsoredAgentTransaction({
+      transaction,
+      agentKeypair,
+    });
+  } catch (sponsoredError) {
+    // Fallback: agent pays own gas
+    try {
+      txDigest = await executeAgentTransaction({
+        transaction,
+        agentKeypair,
+      });
+    } catch (directError) {
+      const sponsoredMsg = sponsoredError instanceof Error ? sponsoredError.message : String(sponsoredError);
+      const directMsg = directError instanceof Error ? directError.message : String(directError);
+      throw new Error(
+        `Transaction execution failed. Sponsored: ${sponsoredMsg}. Direct: ${directMsg}`
+      );
+    }
+  }
+
   return {
     decision,
     policyCheck,
     transaction,
+    txDigest,
     vault,
     orderBook,
   };

@@ -23,6 +23,8 @@ export async function POST(request: NextRequest) {
         decision: result.decision,
         policyCheck: result.policyCheck,
         hasTransaction: result.transaction !== null,
+        txDigest: result.txDigest,
+        timestamp: Date.now(),
         vault: {
           id: result.vault.id,
           balance: mistToSui(result.vault.balance),

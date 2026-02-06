@@ -85,3 +85,49 @@ export async function executeAgentTransaction(params: {
 
   return result.digest;
 }
+
+/**
+ * Execute a transaction where the agent signs the action
+ * and the sponsor pays for gas. No zkLogin involved.
+ *
+ * Flow:
+ * 1. Agent is the sender (owns AgentCap)
+ * 2. Sponsor is the gas owner (pays gas)
+ * 3. Both sign with Ed25519 keypairs
+ * 4. Execute with both signatures (sender first)
+ */
+export async function executeSponsoredAgentTransaction(params: {
+  transaction: Transaction;
+  agentKeypair: Ed25519Keypair;
+}): Promise<string> {
+  const { transaction, agentKeypair } = params;
+
+  const sponsorKeyStr = process.env.SPONSOR_PRIVATE_KEY;
+  if (!sponsorKeyStr) {
+    throw new Error("SPONSOR_PRIVATE_KEY is not set");
+  }
+
+  const sponsorKeypair = Ed25519Keypair.fromSecretKey(sponsorKeyStr);
+  const client = getSuiClient();
+
+  const agentAddress = agentKeypair.getPublicKey().toSuiAddress();
+  const sponsorAddress = sponsorKeypair.getPublicKey().toSuiAddress();
+
+  // Agent is the sender, sponsor pays gas
+  transaction.setSender(agentAddress);
+  transaction.setGasOwner(sponsorAddress);
+
+  const txBytes = await transaction.build({ client });
+
+  // Both sign using signTransaction (returns { signature: string })
+  const agentSig = await agentKeypair.signTransaction(txBytes);
+  const sponsorSig = await sponsorKeypair.signTransaction(txBytes);
+
+  // Execute with both signatures -- sender (agent) first
+  const result = await client.executeTransactionBlock({
+    transactionBlock: txBytes,
+    signature: [agentSig.signature, sponsorSig.signature],
+  });
+
+  return result.digest;
+}
