@@ -33,9 +33,10 @@ export function checkPolicy(params: {
     const elapsed = nowMs - vault.lastTxTime;
     if (elapsed < policy.cooldownMs) {
       const remaining = policy.cooldownMs - elapsed;
+      const remainingSec = Math.ceil(remaining / 1000);
       return {
         allowed: false,
-        reason: `Cooldown active: ${remaining}ms remaining`,
+        reason: `Cooldown active: ${remainingSec}s remaining`,
       };
     }
   }
