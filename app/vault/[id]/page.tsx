@@ -14,6 +14,7 @@ import {
   buildDepositFromGas,
 } from "@/lib/vault/ptb-builder";
 import { executeDirectZkLoginTransaction } from "@/lib/auth/sponsored-tx";
+import { getSuiClient } from "@/lib/sui/client";
 import { mistToSui, suiToMist } from "@/lib/constants";
 import type { VaultData, AgentCapData, OwnerCapData } from "@/lib/vault/types";
 
@@ -229,6 +230,8 @@ export default function VaultDetailPage() {
         maxEpoch: maxEpoch!,
       });
 
+      const client = getSuiClient();
+      await client.waitForTransaction({ digest });
       addToast("success", `AgentCap minted. TX: ${digest}`);
       await refreshVault();
       await refreshAgentCaps(agentAddress);
@@ -264,6 +267,8 @@ export default function VaultDetailPage() {
         maxEpoch: maxEpoch!,
       });
 
+      const client = getSuiClient();
+      await client.waitForTransaction({ digest });
       addToast("success", `Deposited ${amountSui} SUI. TX: ${digest}`);
       setDepositAmount("");
       setShowDepositForm(false);
@@ -299,6 +304,8 @@ export default function VaultDetailPage() {
         maxEpoch: maxEpoch!,
       });
 
+      const client = getSuiClient();
+      await client.waitForTransaction({ digest });
       addToast("success", `Withdrawn all funds. TX: ${digest}`);
       await refreshVault();
     } catch (error) {
@@ -328,6 +335,8 @@ export default function VaultDetailPage() {
         maxEpoch: maxEpoch!,
       });
 
+      const client = getSuiClient();
+      await client.waitForTransaction({ digest });
       addToast("success", `Agent revoked. TX: ${digest}`);
       await refreshVault();
       await refreshAgentCaps(agentAddress);

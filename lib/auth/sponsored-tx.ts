@@ -100,6 +100,12 @@ export async function executeDirectZkLoginTransaction(params: {
     options: { showEffects: true },
   });
 
+  const status = result.effects?.status?.status;
+  if (status !== "success") {
+    const errorMsg = result.effects?.status?.error ?? "Transaction failed on-chain";
+    throw new Error(`zkLogin TX failed: ${errorMsg}`);
+  }
+
   return result.digest;
 }
 
