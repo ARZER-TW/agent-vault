@@ -9,6 +9,7 @@ import { StatCard } from "@/components/vault/stat-card";
 import { PolicyRow } from "@/components/vault/policy-row";
 import { OwnerActions } from "@/components/vault/owner-actions";
 import { DemoModePanel } from "@/components/vault/demo-mode-panel";
+import { GuardrailStressTest } from "@/components/vault/guardrail-stress-test";
 import { useAuthStore } from "@/lib/store/auth-store";
 import { useVaultStore } from "@/lib/store/vault-store";
 import { getVault, getAgentCaps, getOwnerCaps } from "@/lib/vault/service";
@@ -272,6 +273,9 @@ export default function VaultDetailPage() {
                 />
               </div>
             </div>
+
+            {/* Guardrail Stress Test */}
+            <GuardrailStressTest vault={vault} addToast={addToast} />
 
             {/* Owner Actions */}
             {isOwner && ownerCap && canSignTx && (
