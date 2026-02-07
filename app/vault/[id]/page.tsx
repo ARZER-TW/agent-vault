@@ -368,7 +368,10 @@ export default function VaultDetailPage() {
 
       const json = await response.json();
       if (!json.success) {
-        throw new Error(json.error || "Agent run failed");
+        const detail = json.details
+          ? json.details.map((d: { path: string[]; message: string }) => `${d.path.join(".")}: ${d.message}`).join(", ")
+          : "";
+        throw new Error(detail || json.error || "Agent run failed");
       }
 
       addAgentLog(json.data);
@@ -421,7 +424,10 @@ export default function VaultDetailPage() {
 
       const json = await response.json();
       if (!json.success) {
-        throw new Error(json.error || "Demo run failed");
+        const detail = json.details
+          ? json.details.map((d: { path: string[]; message: string }) => `${d.path.join(".")}: ${d.message}`).join(", ")
+          : "";
+        throw new Error(detail || json.error || "Demo run failed");
       }
 
       addAgentLog(json.data);
@@ -689,6 +695,7 @@ export default function VaultDetailPage() {
                   disabled={
                     isRunning ||
                     !activeAgentCap ||
+                    !agentAddress ||
                     Date.now() >= vault.policy.expiresAt
                   }
                   className="btn-primary"
