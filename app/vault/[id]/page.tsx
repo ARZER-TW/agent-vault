@@ -10,6 +10,7 @@ import { PolicyRow } from "@/components/vault/policy-row";
 import { OwnerActions } from "@/components/vault/owner-actions";
 import { DemoModePanel } from "@/components/vault/demo-mode-panel";
 import { GuardrailStressTest } from "@/components/vault/guardrail-stress-test";
+import { StrategyInput } from "@/components/vault/strategy-input";
 import { useAuthStore } from "@/lib/store/auth-store";
 import { useVaultStore } from "@/lib/store/vault-store";
 import { getVault, getAgentCaps, getOwnerCaps } from "@/lib/vault/service";
@@ -29,6 +30,7 @@ export default function VaultDetailPage() {
   const [agentAddress, setAgentAddress] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
+  const [strategy, setStrategy] = useState("");
 
   const canSignTx = address && ephemeralKeypair && zkProof && maxEpoch !== null;
 
@@ -108,6 +110,7 @@ export default function VaultDetailPage() {
           agentCapId: activeAgentCap.id,
           agentAddress,
           ownerAddress: vault.owner,
+          strategy: strategy || undefined,
         }),
       });
 
@@ -293,6 +296,9 @@ export default function VaultDetailPage() {
                 addToast={addToast}
               />
             )}
+
+            {/* Natural Language Strategy */}
+            <StrategyInput strategy={strategy} onStrategyChange={setStrategy} />
 
             {/* Agent Controls */}
             <div className="glass-card p-6 animate-fade-in-up">

@@ -8,6 +8,7 @@ const RequestSchema = z.object({
   agentCapId: z.string().min(1),
   agentAddress: z.string().min(1),
   ownerAddress: z.string().min(1),
+  strategy: z.string().max(500).optional(),
 });
 
 export async function POST(request: NextRequest) {

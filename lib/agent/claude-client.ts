@@ -35,6 +35,19 @@ Rules:
 - Consider the cooldown period between transactions
 - Be conservative with amounts - start small`;
 
+function buildSystemPrompt(strategy?: string): string {
+  if (!strategy || strategy.trim().length === 0) {
+    return SYSTEM_PROMPT;
+  }
+  return `${SYSTEM_PROMPT}
+
+IMPORTANT - User Strategy Directive:
+The vault owner has specified the following trading strategy. Follow it as closely as possible while still respecting all policy constraints:
+---
+${strategy.trim().slice(0, 500)}
+---`;
+}
+
 function buildUserPrompt(params: {
   vault: VaultData;
   orderBook: OrderBookSnapshot;
@@ -79,7 +92,7 @@ function detectProvider(): LLMProvider {
 
 // -- Provider-specific call functions --
 
-async function callAnthropic(userPrompt: string): Promise<string> {
+async function callAnthropic(systemPrompt: string, userPrompt: string): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set");
 
@@ -87,7 +100,7 @@ async function callAnthropic(userPrompt: string): Promise<string> {
   const response = await client.messages.create({
     model: MODELS.anthropic,
     max_tokens: 512,
-    system: SYSTEM_PROMPT,
+    system: systemPrompt,
     messages: [{ role: "user", content: userPrompt }],
   });
 
@@ -98,7 +111,7 @@ async function callAnthropic(userPrompt: string): Promise<string> {
   return textBlock.text;
 }
 
-async function callOpenAI(userPrompt: string): Promise<string> {
+async function callOpenAI(systemPrompt: string, userPrompt: string): Promise<string> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY is not set");
 
@@ -107,7 +120,7 @@ async function callOpenAI(userPrompt: string): Promise<string> {
     model: MODELS.openai,
     max_tokens: 512,
     messages: [
-      { role: "system", content: SYSTEM_PROMPT },
+      { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
     ],
   });
@@ -117,14 +130,14 @@ async function callOpenAI(userPrompt: string): Promise<string> {
   return text;
 }
 
-async function callGemini(userPrompt: string): Promise<string> {
+async function callGemini(systemPrompt: string, userPrompt: string): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY is not set");
 
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({
     model: MODELS.gemini,
-    systemInstruction: SYSTEM_PROMPT,
+    systemInstruction: systemPrompt,
   });
 
   const result = await model.generateContent(userPrompt);
@@ -133,7 +146,7 @@ async function callGemini(userPrompt: string): Promise<string> {
   return text;
 }
 
-const PROVIDER_CALLERS: Record<LLMProvider, (prompt: string) => Promise<string>> = {
+const PROVIDER_CALLERS: Record<LLMProvider, (systemPrompt: string, userPrompt: string) => Promise<string>> = {
   anthropic: callAnthropic,
   openai: callOpenAI,
   gemini: callGemini,
@@ -146,11 +159,13 @@ const PROVIDER_CALLERS: Record<LLMProvider, (prompt: string) => Promise<string>>
 export async function getAgentDecision(params: {
   vault: VaultData;
   orderBook: OrderBookSnapshot;
+  strategy?: string;
 }): Promise<AgentDecision> {
   const provider = detectProvider();
   const caller = PROVIDER_CALLERS[provider];
+  const systemPrompt = buildSystemPrompt(params.strategy);
   const userPrompt = buildUserPrompt(params);
 
-  const rawText = await caller(userPrompt);
+  const rawText = await caller(systemPrompt, userPrompt);
   return parseAgentDecision(rawText);
 }

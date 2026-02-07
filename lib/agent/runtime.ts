@@ -39,8 +39,9 @@ export async function runAgentCycle(params: {
   agentCapId: string;
   agentAddress: string;
   ownerAddress: string;
+  strategy?: string;
 }): Promise<AgentRunResult> {
-  const { vaultId, agentCapId, agentAddress, ownerAddress } = params;
+  const { vaultId, agentCapId, agentAddress, ownerAddress, strategy } = params;
 
   // Step 1: Fetch current vault state
   const vault = await getVault(vaultId);
@@ -49,7 +50,7 @@ export async function runAgentCycle(params: {
   const orderBook = await getOrderBook(agentAddress, DEEPBOOK_POOL_KEY);
 
   // Step 3: Ask Claude for trading decision
-  const decision = await getAgentDecision({ vault, orderBook });
+  const decision = await getAgentDecision({ vault, orderBook, strategy });
 
   // Step 4: If hold, skip policy check and return
   if (decision.action === "hold") {
