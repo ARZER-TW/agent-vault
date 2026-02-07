@@ -11,6 +11,7 @@ import { OwnerActions } from "@/components/vault/owner-actions";
 import { DemoModePanel } from "@/components/vault/demo-mode-panel";
 import { GuardrailStressTest } from "@/components/vault/guardrail-stress-test";
 import { StrategyInput } from "@/components/vault/strategy-input";
+import { AutoRunControls } from "@/components/vault/auto-run-controls";
 import { useAuthStore } from "@/lib/store/auth-store";
 import { useVaultStore } from "@/lib/store/vault-store";
 import { getVault, getAgentCaps, getOwnerCaps } from "@/lib/vault/service";
@@ -355,6 +356,18 @@ export default function VaultDetailPage() {
                   )}
                 </button>
               </div>
+
+              {/* Auto-Run Controls */}
+              <AutoRunControls
+                vault={vault}
+                activeAgentCap={activeAgentCap}
+                agentAddress={agentAddress}
+                strategy={strategy}
+                isRunning={isRunning}
+                onSetRunning={setIsRunning}
+                onVaultUpdate={handleVaultUpdate}
+                addToast={addToast}
+              />
 
               {/* Demo Mode Panel */}
               <DemoModePanel
