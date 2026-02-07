@@ -67,15 +67,29 @@ export async function POST(request: NextRequest) {
       }
 
       case "break_cooldown": {
-        // Simulate a request with nowMs = lastTxTime + 1 (within cooldown)
-        const fakeNow = vault.lastTxTime + 1;
+        // Simulate vault with txCount > 0 and a recent lastTxTime
+        // so the cooldown check is always exercised
+        const fakeLastTxTime = vault.lastTxTime > 0
+          ? vault.lastTxTime
+          : Date.now();
+        const fakeNow = fakeLastTxTime + 1;
+        const fakeTxCount = Math.max(vault.txCount, 1);
+
         const normalAmount = vault.policy.maxPerTx > 0n
           ? vault.policy.maxPerTx / 2n
           : suiToMist(0.01);
+        const testAmount = normalAmount > 0n ? normalAmount : suiToMist(0.01);
+
+        // Create a simulated vault with guaranteed txCount > 0
+        const simulatedVault = {
+          ...vault,
+          txCount: fakeTxCount,
+          lastTxTime: fakeLastTxTime,
+        };
 
         const policyResult = checkPolicy({
-          vault,
-          amount: normalAmount > 0n ? normalAmount : suiToMist(0.01),
+          vault: simulatedVault,
+          amount: testAmount,
           actionType: ACTION_SWAP,
           nowMs: fakeNow,
         });
@@ -87,7 +101,7 @@ export async function POST(request: NextRequest) {
           attempted: {
             timeSinceLastTx: "1ms",
             cooldownRequired: `${vault.policy.cooldownMs / 1000}s`,
-            amount: `${mistToSui(normalAmount > 0n ? normalAmount : suiToMist(0.01)).toFixed(4)} SUI`,
+            amount: `${mistToSui(testAmount).toFixed(4)} SUI`,
           },
           blocked: !policyResult.allowed,
           reason: policyResult.reason,
