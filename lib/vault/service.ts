@@ -8,59 +8,56 @@ const OWNER_CAP_TYPE = `${PACKAGE_ID}::${MODULE_NAME}::OwnerCap`;
 
 // -- Field extraction helpers --
 
+/** Safely unwrap a Move struct field that may be nested as { fields: {...} } or a raw value. */
+function unwrapFields(val: unknown): Record<string, unknown> {
+  if (val !== null && typeof val === "object" && "fields" in (val as Record<string, unknown>)) {
+    const inner = (val as Record<string, unknown>).fields;
+    if (inner !== null && typeof inner === "object") {
+      return inner as Record<string, unknown>;
+    }
+  }
+  if (val !== null && typeof val === "object") {
+    return val as Record<string, unknown>;
+  }
+  // Primitive value — wrap it so callers can access .value
+  return { value: val };
+}
+
 function extractFields(content: unknown): Record<string, unknown> {
   const c = content as {
     dataType: string;
-    fields?: Record<string, unknown> | { fields: Record<string, unknown> };
+    fields?: Record<string, unknown>;
   };
   if (c.dataType !== "moveObject") {
     throw new Error("Expected moveObject content");
   }
-  const raw = c.fields;
-  if (!raw) throw new Error("Missing fields in moveObject");
-  // SuiParsedData.fields can be { fields: {...}, type: string } or { [key]: MoveValue }
-  if ("fields" in raw && typeof raw.fields === "object" && raw.fields !== null) {
-    return raw.fields as Record<string, unknown>;
-  }
-  return raw as Record<string, unknown>;
+  if (!c.fields) throw new Error("Missing fields in moveObject");
+  return unwrapFields(c.fields);
 }
 
-function parsePolicy(policyFields: Record<string, unknown>): Policy {
-  // policy.fields contains the nested struct fields
-  const inner =
-    "fields" in policyFields &&
-    typeof policyFields.fields === "object" &&
-    policyFields.fields !== null
-      ? (policyFields.fields as Record<string, unknown>)
-      : policyFields;
-
+function parsePolicy(raw: unknown): Policy {
+  const f = unwrapFields(raw);
   return {
-    maxBudget: BigInt(inner.max_budget as string),
-    maxPerTx: BigInt(inner.max_per_tx as string),
-    allowedActions: (inner.allowed_actions as number[]) ?? [],
-    cooldownMs: Number(inner.cooldown_ms as string),
-    expiresAt: Number(inner.expires_at as string),
+    maxBudget: BigInt(String(f.max_budget ?? 0)),
+    maxPerTx: BigInt(String(f.max_per_tx ?? 0)),
+    allowedActions: (f.allowed_actions as number[]) ?? [],
+    cooldownMs: Number(f.cooldown_ms ?? 0),
+    expiresAt: Number(f.expires_at ?? 0),
   };
 }
 
 function parseVaultData(objectId: string, fields: Record<string, unknown>): VaultData {
-  const balanceField = fields.balance_sui as Record<string, unknown>;
-  const balanceValue =
-    "fields" in balanceField &&
-    typeof balanceField.fields === "object" &&
-    balanceField.fields !== null
-      ? (balanceField.fields as Record<string, unknown>).value
-      : balanceField.value;
+  const balanceInner = unwrapFields(fields.balance_sui);
 
   return {
     id: objectId,
     owner: fields.owner as string,
-    balance: BigInt(balanceValue as string),
-    policy: parsePolicy(fields.policy as Record<string, unknown>),
+    balance: BigInt(String(balanceInner.value ?? 0)),
+    policy: parsePolicy(fields.policy),
     authorizedCaps: (fields.authorized_caps as string[]) ?? [],
-    totalSpent: BigInt(fields.total_spent as string),
-    lastTxTime: Number(fields.last_tx_time as string),
-    txCount: Number(fields.tx_count as string),
+    totalSpent: BigInt(String(fields.total_spent ?? 0)),
+    lastTxTime: Number(fields.last_tx_time ?? 0),
+    txCount: Number(fields.tx_count ?? 0),
   };
 }
 
