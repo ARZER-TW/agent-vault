@@ -8,6 +8,7 @@ import {
   executeSponsoredAgentTransaction,
   executeAgentTransaction,
 } from "@/lib/auth/sponsored-tx";
+import { getSuiClient } from "@/lib/sui/client";
 import { suiToMist, mistToSui, ACTION_SWAP } from "@/lib/constants";
 
 const DemoRequestSchema = z.object({
@@ -96,6 +97,11 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Wait for transaction confirmation and re-fetch vault
+    const client = getSuiClient();
+    await client.waitForTransaction({ digest: txDigest });
+    const updatedVault = await getVault(params.vaultId);
+
     return NextResponse.json({
       success: true,
       data: {
@@ -105,10 +111,10 @@ export async function POST(request: NextRequest) {
         txDigest,
         timestamp: Date.now(),
         vault: {
-          id: vault.id,
-          balance: mistToSui(vault.balance),
-          totalSpent: mistToSui(vault.totalSpent),
-          txCount: vault.txCount,
+          id: updatedVault.id,
+          balance: mistToSui(updatedVault.balance),
+          totalSpent: mistToSui(updatedVault.totalSpent),
+          txCount: updatedVault.txCount,
         },
       },
     });

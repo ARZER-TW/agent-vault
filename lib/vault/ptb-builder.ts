@@ -73,6 +73,33 @@ export function buildDeposit(params: {
 }
 
 /**
+ * Build PTB to deposit SUI from gas coin into a Vault.
+ * Splits exact amount from gas coin to avoid coin selection.
+ */
+export function buildDepositFromGas(params: {
+  vaultId: string;
+  ownerCapId: string;
+  amount: bigint;
+}): Transaction {
+  const tx = new Transaction();
+
+  const [depositCoin] = tx.splitCoins(tx.gas, [
+    tx.pure.u64(params.amount),
+  ]);
+
+  tx.moveCall({
+    target: `${PACKAGE_ID}::${MODULE_NAME}::deposit`,
+    arguments: [
+      tx.object(params.vaultId),
+      tx.object(params.ownerCapId),
+      depositCoin,
+    ],
+  });
+
+  return tx;
+}
+
+/**
  * Build PTB for owner to withdraw all funds.
  */
 export function buildWithdrawAll(params: {

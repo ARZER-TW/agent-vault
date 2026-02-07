@@ -17,6 +17,9 @@ export async function POST(request: NextRequest) {
 
     const result = await runAgentCycle(params);
 
+    // result.vault is already the post-TX updated vault from runtime
+    const vault = result.vault;
+
     return NextResponse.json({
       success: true,
       data: {
@@ -26,10 +29,10 @@ export async function POST(request: NextRequest) {
         txDigest: result.txDigest,
         timestamp: Date.now(),
         vault: {
-          id: result.vault.id,
-          balance: mistToSui(result.vault.balance),
-          totalSpent: mistToSui(result.vault.totalSpent),
-          txCount: result.vault.txCount,
+          id: vault.id,
+          balance: mistToSui(vault.balance),
+          totalSpent: mistToSui(vault.totalSpent),
+          txCount: vault.txCount,
         },
         market: {
           midPrice: result.orderBook.midPrice,

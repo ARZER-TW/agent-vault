@@ -14,6 +14,7 @@ import {
   executeSponsoredAgentTransaction,
   executeAgentTransaction,
 } from "@/lib/auth/sponsored-tx";
+import { getSuiClient } from "@/lib/sui/client";
 
 export interface AgentRunResult {
   decision: AgentDecision;
@@ -167,12 +168,19 @@ export async function runAgentCycle(params: {
     }
   }
 
+  // Wait for transaction to be confirmed before returning
+  const client = getSuiClient();
+  await client.waitForTransaction({ digest: txDigest });
+
+  // Re-fetch vault with confirmed state
+  const updatedVault = await getVault(vaultId);
+
   return {
     decision,
     policyCheck,
     transaction,
     txDigest,
-    vault,
+    vault: updatedVault,
     orderBook,
   };
 }

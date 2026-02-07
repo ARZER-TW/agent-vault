@@ -156,9 +156,6 @@ export async function completeZkLogin(params: {
     decoded.iss,
   );
 
-  console.log("[zklogin] Enoki addressSeed:", zkProof.addressSeed);
-  console.log("[zklogin] Derived address:", finalAddress);
-
   return {
     address: finalAddress,
     ephemeralKeypair,

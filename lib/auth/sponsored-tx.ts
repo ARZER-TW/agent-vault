@@ -129,7 +129,14 @@ export async function executeAgentTransaction(params: {
   const result = await client.signAndExecuteTransaction({
     transaction,
     signer: agentKeypair,
+    options: { showEffects: true },
   });
+
+  const status = result.effects?.status?.status;
+  if (status !== "success") {
+    const errorMsg = result.effects?.status?.error ?? "Transaction failed on-chain";
+    throw new Error(`Agent TX failed: ${errorMsg}`);
+  }
 
   return result.digest;
 }
@@ -167,7 +174,14 @@ export async function executeSponsoredAgentTransaction(params: {
   const result = await client.executeTransactionBlock({
     transactionBlock: txBytes,
     signature: [agentSig.signature, sponsorSig.signature],
+    options: { showEffects: true },
   });
+
+  const status = result.effects?.status?.status;
+  if (status !== "success") {
+    const errorMsg = result.effects?.status?.error ?? "Transaction failed on-chain";
+    throw new Error(`Sponsored agent TX failed: ${errorMsg}`);
+  }
 
   return result.digest;
 }
