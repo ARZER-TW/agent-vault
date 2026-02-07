@@ -18,11 +18,8 @@ export const DEEPBOOK_POOL_KEY = "SUI_DBUSDC";
 
 // Action types (matching Move contract)
 export const ACTION_SWAP = 0;
-export const ACTION_LIMIT_ORDER = 1;
 
 // Unit conversion
-export const MIST_PER_SUI = 1_000_000_000n;
-
 export function suiToMist(sui: number): bigint {
   return BigInt(Math.floor(sui * 1e9));
 }

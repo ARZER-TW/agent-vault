@@ -185,21 +185,4 @@ export async function getOwnedVaults(ownerAddress: string): Promise<VaultData[]>
   return vaults;
 }
 
-/**
- * Check if an AgentCap is still authorized on its Vault.
- */
-export async function isAgentCapAuthorized(
-  agentCapId: string,
-  vaultId: string,
-): Promise<boolean> {
-  const vault = await getVault(vaultId);
-  return vault.authorizedCaps.includes(agentCapId);
-}
 
-/**
- * Get remaining budget for a vault (max_budget - total_spent).
- */
-export async function getRemainingBudget(vaultId: string): Promise<bigint> {
-  const vault = await getVault(vaultId);
-  return vault.policy.maxBudget - vault.totalSpent;
-}

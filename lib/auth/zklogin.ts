@@ -244,18 +244,4 @@ export function clearAuthSession(): void {
   sessionStorage.removeItem(MAX_EPOCH_KEY);
 }
 
-/**
- * Derive a deterministic user salt from the JWT sub claim.
- * In production, this should be stored server-side per user.
- */
-export function deriveUserSalt(jwtSub: string): string {
-  // Simple deterministic salt for hackathon demo
-  // Production should use a secure server-side salt storage
-  const encoder = new TextEncoder();
-  const data = encoder.encode(`agent-vault-salt-${jwtSub}`);
-  let hash = 0n;
-  for (const byte of data) {
-    hash = (hash * 31n + BigInt(byte)) % (2n ** 128n);
-  }
-  return hash.toString();
-}
+

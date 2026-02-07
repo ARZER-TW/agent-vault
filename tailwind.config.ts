@@ -36,8 +36,6 @@ const config: Config = {
       },
       boxShadow: {
         glow: "0 0 20px rgba(0, 212, 255, 0.15)",
-        "glow-strong": "0 0 40px rgba(0, 212, 255, 0.25)",
-        "glow-amber": "0 0 20px rgba(245, 158, 11, 0.15)",
       },
     },
   },

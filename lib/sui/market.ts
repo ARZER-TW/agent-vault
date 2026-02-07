@@ -62,24 +62,4 @@ export async function getSwapQuote(
   };
 }
 
-/**
- * Get pool trading parameters.
- */
-export async function getPoolInfo(
-  address: string,
-  poolKey: string = DEFAULT_POOL_KEY,
-) {
-  const client = getDeepBookClient(address);
 
-  const [tradeParams, bookParams, isWhitelisted] = await Promise.all([
-    client.poolTradeParams(poolKey),
-    client.poolBookParams(poolKey),
-    client.whitelisted(poolKey),
-  ]);
-
-  return {
-    ...tradeParams,
-    ...bookParams,
-    whitelisted: isWhitelisted,
-  };
-}

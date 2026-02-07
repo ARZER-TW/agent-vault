@@ -51,28 +51,6 @@ export function buildCreateVault(params: {
 }
 
 /**
- * Build PTB to deposit SUI into a Vault.
- */
-export function buildDeposit(params: {
-  vaultId: string;
-  ownerCapId: string;
-  coinObjectId: string;
-}): Transaction {
-  const tx = new Transaction();
-
-  tx.moveCall({
-    target: `${PACKAGE_ID}::${MODULE_NAME}::deposit`,
-    arguments: [
-      tx.object(params.vaultId),
-      tx.object(params.ownerCapId),
-      tx.object(params.coinObjectId),
-    ],
-  });
-
-  return tx;
-}
-
-/**
  * Build PTB to deposit SUI from gas coin into a Vault.
  * Splits exact amount from gas coin to avoid coin selection.
  */
@@ -118,36 +96,6 @@ export function buildWithdrawAll(params: {
   });
 
   tx.transferObjects([coin], params.recipientAddress);
-
-  return tx;
-}
-
-/**
- * Build PTB to update vault policy.
- */
-export function buildUpdatePolicy(params: {
-  vaultId: string;
-  ownerCapId: string;
-  maxBudget: bigint;
-  maxPerTx: bigint;
-  allowedActions: number[];
-  cooldownMs: bigint;
-  expiresAt: bigint;
-}): Transaction {
-  const tx = new Transaction();
-
-  tx.moveCall({
-    target: `${PACKAGE_ID}::${MODULE_NAME}::update_policy`,
-    arguments: [
-      tx.object(params.vaultId),
-      tx.object(params.ownerCapId),
-      tx.pure.u64(params.maxBudget),
-      tx.pure.u64(params.maxPerTx),
-      tx.pure.vector("u8", params.allowedActions),
-      tx.pure.u64(params.cooldownMs),
-      tx.pure.u64(params.expiresAt),
-    ],
-  });
 
   return tx;
 }

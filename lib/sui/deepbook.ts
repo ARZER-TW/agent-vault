@@ -19,9 +19,4 @@ export function getDeepBookClient(address: string): DeepBookClient {
   return dbClient;
 }
 
-/**
- * Reset the DeepBookClient (useful when address changes).
- */
-export function resetDeepBookClient(): void {
-  dbClient = null;
-}
+

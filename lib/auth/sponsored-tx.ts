@@ -5,65 +5,6 @@ import { getSuiClient } from "@/lib/sui/client";
 import { buildZkLoginSignature } from "./zklogin";
 
 /**
- * Execute a sponsored transaction where the sponsor pays gas.
- *
- * Client-side flow:
- * 1. Fetch sponsor address from server
- * 2. Build and sign transaction with ephemeral key
- * 3. Wrap ephemeral signature in zkLogin envelope
- * 4. Send to server for sponsor co-signing and execution
- */
-export async function executeSponsoredTransaction(params: {
-  transaction: Transaction;
-  senderAddress: string;
-  ephemeralKeypair: Ed25519Keypair;
-  zkProof: ZkLoginSignatureInputs;
-  maxEpoch: number;
-}): Promise<string> {
-  const { transaction, senderAddress, ephemeralKeypair, zkProof, maxEpoch } =
-    params;
-
-  const client = getSuiClient();
-
-  // Fetch sponsor address from server
-  const sponsorAddr = await fetchSponsorAddress();
-
-  // Set sender (zkLogin user) and gas owner (sponsor)
-  transaction.setSender(senderAddress);
-  transaction.setGasOwner(sponsorAddr);
-
-  // Use Transaction.sign() - the SDK-recommended approach
-  // This builds the TX bytes and signs with the ephemeral key
-  const { bytes: txBytesBase64, signature: ephemeralSignature } =
-    await transaction.sign({ client, signer: ephemeralKeypair });
-
-  // Wrap the ephemeral signature in a zkLogin envelope
-  const zkLoginSig = buildZkLoginSignature({
-    userSignature: ephemeralSignature,
-    zkProof,
-    maxEpoch,
-  });
-
-  // Send to sponsor API for co-signing and execution
-  const response = await fetch("/api/sponsor/sign-and-execute", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      txBytes: txBytesBase64,
-      userSignature: zkLoginSig,
-    }),
-  });
-
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({}));
-    throw new Error(data.error ?? `Sponsor API error (${response.status})`);
-  }
-
-  const { digest } = await response.json();
-  return digest;
-}
-
-/**
  * Execute a NON-sponsored transaction where the user pays their own gas.
  * Used for debugging to isolate zkLogin signature issues from sponsor issues.
  */
@@ -107,18 +48,6 @@ export async function executeDirectZkLoginTransaction(params: {
   }
 
   return result.digest;
-}
-
-/**
- * Fetch the sponsor wallet address from the server.
- */
-async function fetchSponsorAddress(): Promise<string> {
-  const response = await fetch("/api/sponsor/address");
-  if (!response.ok) {
-    throw new Error("Failed to fetch sponsor address");
-  }
-  const { address } = await response.json();
-  return address;
 }
 
 /**
