@@ -3,8 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/lib/store/auth-store";
-import { completeZkLogin, deriveUserSalt } from "@/lib/auth/zklogin";
-import { decodeJwt } from "@mysten/sui/zklogin";
+import { completeZkLogin } from "@/lib/auth/zklogin";
 
 const statusConfig: Record<string, { color: string; pulse: boolean }> = {
   processing: { color: "text-accent", pulse: true },
@@ -38,23 +37,10 @@ export default function AuthCallbackPage() {
           return;
         }
 
-        setStatus("verifying");
-        setMessage("Verifying token...");
-
-        const decoded = decodeJwt(jwt);
-        const sub = decoded.sub;
-        if (!sub) {
-          setStatus("error");
-          setMessage("Invalid token - missing sub claim.");
-          return;
-        }
-
-        const userSalt = deriveUserSalt(sub);
-
         setStatus("fetching");
         setMessage("Fetching ZK proof...");
 
-        const session = await completeZkLogin({ jwt, userSalt });
+        const session = await completeZkLogin({ jwt });
 
         login({
           address: session.address,
