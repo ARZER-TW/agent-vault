@@ -9,7 +9,7 @@ export const AgentDecisionSchema = z.object({
   confidence: z.number().min(0).max(1),
   params: z
     .object({
-      amount: z.string().regex(/^\d+(\.\d+)?$/, "Must be a numeric string"),
+      amount: z.string().regex(/^\d+(\.\d+)?$/, "Must be a numeric string").optional(),
       minOut: z.string().regex(/^\d+(\.\d+)?$/).optional(),
     })
     .optional(),
@@ -24,7 +24,17 @@ export type AgentDecision = z.infer<typeof AgentDecisionSchema>;
 export function parseAgentDecision(responseText: string): AgentDecision {
   const jsonStr = extractJson(responseText);
   const parsed = JSON.parse(jsonStr);
-  return AgentDecisionSchema.parse(parsed);
+  try {
+    return AgentDecisionSchema.parse(parsed);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      const details = error.errors
+        .map((e) => `${e.path.join(".")}: ${e.message}`)
+        .join(", ");
+      throw new Error(`AI response validation failed: ${details}`);
+    }
+    throw error;
+  }
 }
 
 /**

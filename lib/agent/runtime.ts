@@ -65,6 +65,16 @@ export async function runAgentCycle(params: {
 
   // Step 5: Parse amount and check policy
   const amountSui = parseFloat(decision.params?.amount ?? "0");
+  if (amountSui <= 0) {
+    return {
+      decision,
+      policyCheck: { allowed: true, reason: "No amount specified - treating as hold" },
+      transaction: null,
+      txDigest: null,
+      vault,
+      orderBook,
+    };
+  }
   const amountMist = suiToMist(amountSui);
 
   const policyCheck = checkPolicy({
