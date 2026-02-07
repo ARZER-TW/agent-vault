@@ -2,7 +2,7 @@
 
 > 部署程序、常見問題修復、維運指南
 
-**Last Updated:** 2026-02-06
+**Last Updated:** 2026-02-07
 
 ---
 
@@ -10,32 +10,32 @@
 
 ### Move Contract Deployment
 
-合約已部署到 Sui Testnet。如需重新部署：
+Contract is deployed to Sui Testnet. To redeploy:
 
 ```bash
 cd contracts
 
-# 1. 確認所有測試通過
+# 1. Verify all tests pass
 sui move test
 
-# 2. 部署到 Testnet
+# 2. Deploy to Testnet
 sui client publish --gas-budget 100000000
 
-# 3. 從輸出中取得 Package ID
-# 搜尋 "Published Objects" 區塊中的 packageId
+# 3. Get Package ID from output
+# Look for "Published Objects" section -> packageId
 
-# 4. 更新環境變數
+# 4. Update environment variables
 # .env.local:
 # NEXT_PUBLIC_PACKAGE_ID=0x<new-package-id>
-# 同時更新 .env.example 中的註釋
+# Also update the comment in .env.example
 ```
 
-**注意事項:**
-- 每次 publish 會產生新的 Package ID
-- 所有先前建立的 Vault 和 AgentCap 只能配合舊 Package ID 使用
-- 新部署 = 全新開始，舊資料不可遷移
+**Important:**
+- Each publish produces a new Package ID
+- All previously created Vaults and AgentCaps only work with their original Package ID
+- New deployment = fresh start; old data is not migratable
 
-### 目前部署資訊
+### Current Deployment Info
 
 | Item        | Value                                                              |
 |-------------|--------------------------------------------------------------------|
@@ -47,34 +47,35 @@ sui client publish --gas-budget 100000000
 ### Frontend Deployment (Vercel)
 
 ```bash
-# 1. 安裝 Vercel CLI
+# 1. Install Vercel CLI
 npm install -g vercel
 
-# 2. 部署
+# 2. Deploy
 vercel
 
-# 3. 設定環境變數
-# 在 Vercel Dashboard -> Settings -> Environment Variables 中設定：
+# 3. Set environment variables
+# In Vercel Dashboard -> Settings -> Environment Variables:
 # - NEXT_PUBLIC_SUI_NETWORK
 # - NEXT_PUBLIC_PACKAGE_ID
 # - NEXT_PUBLIC_GOOGLE_CLIENT_ID
 # - GOOGLE_CLIENT_SECRET
-# - NEXT_PUBLIC_REDIRECT_URI  (改為 production URL)
-# - ANTHROPIC_API_KEY
+# - NEXT_PUBLIC_REDIRECT_URI  (change to production URL)
+# - NEXT_PUBLIC_ENOKI_API_KEY
+# - OPENAI_API_KEY (or GEMINI_API_KEY or ANTHROPIC_API_KEY)
 # - SPONSOR_PRIVATE_KEY
 # - AGENT_PRIVATE_KEY
 ```
 
-**注意**: 部署到 production 後，需要在 Google Cloud Console 中添加 production 的 callback URL。
+**Note**: After deploying to production, add the production callback URL in Google Cloud Console.
 
 ### Build Verification
 
 ```bash
-# 本地 build 驗證
+# Local build verification
 pnpm build
 
-# 確認沒有 TypeScript 錯誤
-# 確認所有頁面正常生成
+# Verify no TypeScript errors
+# Verify all pages generate correctly
 ```
 
 ---
@@ -83,38 +84,52 @@ pnpm build
 
 ### Sponsor Wallet
 
-Sponsor 錢包負責為所有用戶交易代付 gas。
+The sponsor wallet pays gas for all user and agent transactions.
 
-**監控:**
+**Monitor balance:**
 ```bash
-# 查看 Sponsor 錢包餘額
 sui client gas --address <SPONSOR_ADDRESS>
 ```
 
-**充值:**
+**Fund wallet:**
 ```bash
-# Testnet: 使用 faucet
+# Testnet: use faucet
 sui client faucet --address <SPONSOR_ADDRESS>
 
-# 每次 faucet 約提供 1 SUI
-# 建議保持至少 5 SUI 的餘額
+# Each faucet call provides approximately 1 SUI
+# Maintain at least 5 SUI balance
 ```
 
-**告警閾值:**
-- 低於 2 SUI: 需要充值
-- 低於 0.5 SUI: 緊急充值（交易可能開始失敗）
+**Alert thresholds:**
+- Below 2 SUI: refund needed
+- Below 0.5 SUI: urgent (transactions will start failing)
+
+**Check sponsor address from running app:**
+```bash
+curl http://localhost:3000/api/sponsor/address
+```
 
 ### Agent Wallet
 
-Agent 錢包用於執行 AI 交易。
+The agent wallet executes AI-driven trades.
 
-**需要持有:**
-- 少量 SUI (gas，但通常由 sponsor 支付)
-- 少量 DEEP token (DeepBook V3 手續費)
+**Required holdings:**
+- Small amount of SUI (gas; usually covered by sponsor)
+- Small amount of DEEP token (DeepBook V3 trading fees)
 
-**取得 DEEP token (Testnet):**
-- 使用 DEEP/SUI 白名單池（0% 手續費）交換取得
-- 或使用 DEEP testnet faucet (如果可用)
+**Get DEEP tokens on Testnet:**
+- Swap using DEEP/SUI whitelisted pool (0% fee)
+- Or use DEEP testnet faucet (if available)
+
+**Check agent address from running app:**
+```bash
+curl http://localhost:3000/api/agent/address
+```
+
+**Check agent wallet objects:**
+```bash
+sui client objects --address <AGENT_ADDRESS>
+```
 
 ---
 
@@ -122,92 +137,135 @@ Agent 錢包用於執行 AI 交易。
 
 ### Issue: zkLogin "ZK prover error"
 
-**症狀:** 使用者登入後在 callback 頁面看到 "ZK prover error" 訊息
+**Symptoms:** User sees "ZK prover error" on the callback page after Google login
 
-**可能原因:**
-1. Mysten ZK Prover 服務暫時不可用
-2. Ephemeral keypair 過期 (maxEpoch 已過)
-3. JWT token 無效或已過期
+**Possible causes:**
+1. Mysten Enoki API service temporarily unavailable
+2. Ephemeral keypair expired (maxEpoch has passed)
+3. JWT token invalid or expired
+4. ENOKI_API_KEY missing or invalid
 
-**修復:**
-1. 等待幾分鐘後重試（Prover 服務可能在維護）
-2. 清除瀏覽器 sessionStorage 後重新登入
-3. 檢查 Google OAuth Client ID 設定是否正確
+**Fix:**
+1. Wait a few minutes and retry (Enoki service may be in maintenance)
+2. Clear browser `sessionStorage` and log in again
+3. Verify Google OAuth Client ID is correct
+4. Verify `NEXT_PUBLIC_ENOKI_API_KEY` is set in `.env.local`
+
+### Issue: "No LLM API key found"
+
+**Symptoms:** Agent run fails with "No LLM API key found. Set one of: OPENAI_API_KEY, GEMINI_API_KEY, ANTHROPIC_API_KEY"
+
+**Fix:**
+1. Set at least one LLM API key in `.env.local`
+2. Restart the dev server after changing `.env.local`
+3. Optionally set `LLM_PROVIDER` to force a specific provider
 
 ### Issue: "Vault not found"
 
-**症狀:** API 或前端頁面報告 vault 找不到
+**Symptoms:** API or frontend page reports vault not found
 
-**可能原因:**
-1. Vault ID 來自不同 network
-2. Package ID 不匹配（舊合約的 Vault）
-3. Vault ID 格式錯誤
+**Possible causes:**
+1. Vault ID is from a different network
+2. Package ID mismatch (vault was created with a different contract)
+3. Vault ID format is incorrect
 
-**修復:**
-1. 確認 `NEXT_PUBLIC_SUI_NETWORK` 與 vault 所在的 network 一致
-2. 確認 `NEXT_PUBLIC_PACKAGE_ID` 與建立 vault 時的 package 一致
-3. 在 Sui Explorer 上驗證 object ID 是否存在
+**Fix:**
+1. Confirm `NEXT_PUBLIC_SUI_NETWORK` matches the vault's network
+2. Confirm `NEXT_PUBLIC_PACKAGE_ID` matches the package used to create the vault
+3. Verify object ID exists on [Sui Explorer](https://suiscan.xyz/testnet)
 
 ### Issue: DeepBook Swap Fails
 
-**症狀:** Agent 嘗試 swap 時交易失敗
+**Symptoms:** Agent swap transaction fails on-chain
 
-**可能原因:**
-1. DEEP token 不足（手續費）
-2. minOut 設置過高（滑點保護觸發）
-3. Pool 流動性不足
-4. Coin object 已被使用（gas coin 衝突）
+**Possible causes:**
+1. Insufficient DEEP tokens (trading fee)
+2. `minOut` set too high (slippage protection triggered)
+3. Pool has insufficient liquidity
+4. Coin object already consumed (gas coin conflict)
 
-**修復:**
-1. 確認 Agent 地址持有 DEEP token:
+**Fix:**
+1. Verify Agent address holds DEEP tokens:
    ```bash
    sui client objects --address <AGENT_ADDRESS>
    ```
-2. 降低 minOut 值（或設為 0 用於測試）
-3. 在 DeepBook 掛對手單增加流動性
-4. 確保 PTB 中沒有重複使用同一個 coin object
+2. Lower `minOut` value (or set to 0 for testing)
+3. Place counterparty orders on DeepBook to add liquidity
+4. Ensure PTB does not reuse the same coin object
+5. Run diagnostics: `npx tsx scripts/test-deepbook.ts`
 
-### Issue: Policy Check Fails on-chain but passes off-chain
+### Issue: Policy Check Fails On-Chain but Passes Off-Chain
 
-**症狀:** `policy-checker.ts` 通過但鏈上交易被 abort
+**Symptoms:** `policy-checker.ts` passes but on-chain transaction aborts
 
-**可能原因:**
-1. 時間差：off-chain 檢查和鏈上執行之間的延遲
-2. 並發交易：另一筆交易在 off-chain 檢查後修改了 vault 狀態
-3. Clock timestamp 差異
+**Possible causes:**
+1. Time difference between off-chain check and on-chain execution
+2. Concurrent transaction modified vault state after off-chain check
+3. Clock timestamp discrepancy
 
-**修復:**
-1. off-chain 檢查時加入安全邊際（例如 cooldown 多加 5 秒）
-2. 在交易失敗後重新查詢 vault 狀態再重試
-3. 使用 `Date.now()` 而非其他時間來源
+**Fix:**
+1. Add safety margin to off-chain checks (e.g., extra 5 seconds for cooldown)
+2. Re-fetch vault state after transaction failure, then retry
+3. Use `Date.now()` consistently as the time source
 
 ### Issue: Sponsored TX Signature Invalid
 
-**症狀:** `executeTransactionBlock` 返回簽名錯誤
+**Symptoms:** `executeTransactionBlock` returns signature error
 
-**可能原因:**
-1. Sponsor keypair 與 gas owner 地址不匹配
-2. Transaction bytes 在簽名後被修改
-3. zkLogin signature 中的 maxEpoch 已過期
+**Possible causes:**
+1. Sponsor keypair does not match gas owner address
+2. Transaction bytes were modified after signing
+3. zkLogin signature's maxEpoch has expired
 
-**修復:**
-1. 確認 `SPONSOR_PRIVATE_KEY` 對應的地址與 `setGasOwner` 一致
-2. 確保在 `build()` 之後不再修改 transaction
-3. 重新登入以刷新 ephemeral keypair 和 maxEpoch
+**Fix:**
+1. Verify `SPONSOR_PRIVATE_KEY` derives the same address used in `setGasOwner`
+2. Ensure transaction is not modified after `build()`
+3. Log in again to refresh ephemeral keypair and maxEpoch
 
-### Issue: Claude API Returns Invalid JSON
+### Issue: LLM Returns Invalid JSON
 
-**症狀:** `parseAgentDecision` 拋出解析錯誤
+**Symptoms:** `parseAgentDecision` throws a parse error
 
-**可能原因:**
-1. Claude 返回了 JSON 以外的內容
-2. Claude 返回了不符合 schema 的 JSON
-3. Rate limiting 或 API 錯誤
+**Possible causes:**
+1. LLM returned non-JSON content (explanation text, etc.)
+2. LLM returned JSON that doesn't match the Zod schema
+3. Rate limiting or API error from the provider
 
-**修復:**
-1. Intent parser 已支援 markdown code block 提取（```json blocks）
-2. 確認 system prompt 明確要求 JSON-only 回應
-3. 檢查 Anthropic API key 餘額和 rate limits
+**Fix:**
+1. Intent parser already supports markdown code block extraction (```json blocks)
+2. Verify system prompt explicitly requests JSON-only response
+3. Check API key balance and rate limits at the provider's console
+4. Try switching to a different LLM provider via `LLM_PROVIDER` env var
+
+### Issue: Agent TX Fails with "Transaction execution failed"
+
+**Symptoms:** Both sponsored and direct execution fail
+
+**Fix:**
+1. Check the detailed error message (it includes both sponsored and direct errors)
+2. Verify on-chain vault state matches expectations:
+   ```bash
+   curl http://localhost:3000/api/vault/<VAULT_ID>
+   ```
+3. Verify AgentCap is still authorized (not revoked)
+4. Verify vault policy has not expired
+5. Check if cooldown period has elapsed since last transaction
+
+---
+
+## Move Contract Error Code Reference
+
+| Code | Constant                | Trigger Condition                          |
+|------|-------------------------|--------------------------------------------|
+| 0    | `E_NOT_OWNER`           | OwnerCap vault_id does not match Vault     |
+| 1    | `E_BUDGET_EXCEEDED`     | total_spent + amount > max_budget          |
+| 2    | `E_NOT_WHITELISTED`     | Action type not in allowed_actions list    |
+| 3    | `E_EXPIRED`             | Current time >= expires_at                 |
+| 4    | `E_COOLDOWN`            | Time since last tx < cooldown_ms           |
+| 5    | `E_INVALID_CAP`         | AgentCap not authorized or wrong vault     |
+| 6    | `E_INSUFFICIENT_BALANCE`| Vault balance < requested amount           |
+| 7    | `E_PER_TX_EXCEEDED`     | amount > max_per_tx                        |
+| 8    | `E_ZERO_AMOUNT`         | amount == 0                                |
 
 ---
 
@@ -216,32 +274,32 @@ Agent 錢包用於執行 AI 交易。
 ### Frontend Rollback (Vercel)
 
 ```bash
-# 列出近期部署
+# List recent deployments
 vercel ls
 
-# 回滾到指定部署
+# Roll back to a specific deployment
 vercel rollback <deployment-url>
 ```
 
-或在 Vercel Dashboard -> Deployments 中選擇舊版本重新部署。
+Or in Vercel Dashboard -> Deployments, select an older version to redeploy.
 
 ### Contract Rollback
 
-**Move 合約無法回滾。** 如果新版合約有問題：
+**Move contracts cannot be rolled back.** If a new contract version has issues:
 
-1. 停止使用新 Package ID（將前端指向舊 Package ID）
-2. 如果需要修復，publish 修正版本（新 Package ID）
-3. 所有舊 Vault 只能配合建立時的 Package ID 使用
+1. Stop using the new Package ID (point frontend to old Package ID)
+2. If a fix is needed, publish a corrected version (new Package ID)
+3. All existing Vaults only work with the Package ID they were created under
 
 ### Data Recovery
 
-Vault 資金在鏈上，永遠安全：
+Vault funds are on-chain and always safe:
 
-1. **Owner 可隨時提取**: 使用 `withdraw_all` 函式
-2. **AgentCap 可隨時撤銷**: 使用 `revoke_agent_cap` 函式
-3. **資金不依賴前端**: 即使前端離線，可使用 Sui CLI 直接呼叫合約
+1. **Owner can always withdraw**: Use `withdraw_all` function
+2. **AgentCap can always be revoked**: Use `revoke_agent_cap` function
+3. **Funds don't depend on frontend**: Even if frontend is offline, use Sui CLI to call the contract directly
 
-手動提取資金（無需前端）:
+Manual fund withdrawal (no frontend needed):
 
 ```bash
 sui client call \
@@ -254,31 +312,34 @@ sui client call \
 
 ---
 
-## Monitoring Checklist
+## Monitoring Checklists
 
 ### Daily
 
-- [ ] Sponsor 錢包餘額 > 2 SUI
-- [ ] Agent 錢包持有 DEEP token
-- [ ] Frontend 可正常訪問
-- [ ] zkLogin prover 服務可用
+- [ ] Sponsor wallet balance > 2 SUI
+- [ ] Agent wallet holds DEEP tokens
+- [ ] Frontend is accessible
+- [ ] zkLogin Enoki service is available
 
 ### Before Demo
 
-- [ ] 所有測試通過 (`pnpm vitest run` + `sui move test`)
-- [ ] Frontend build 成功 (`pnpm build`)
-- [ ] 預先登入 zkLogin（避免現場等待 ZK prover）
-- [ ] 確認 Testnet pool 有流動性
-- [ ] Sponsor 錢包餘額充足（> 5 SUI）
-- [ ] DEEP token 餘額足夠
-- [ ] 準備好備用市場數據（以防 DeepBook 異常）
+- [ ] All tests pass (`pnpm vitest run` + `cd contracts && sui move test`)
+- [ ] Frontend build succeeds (`pnpm build`)
+- [ ] Pre-login with zkLogin (avoid waiting for ZK prover on stage)
+- [ ] Verify Testnet pool has liquidity (`npx tsx scripts/test-deepbook.ts`)
+- [ ] Sponsor wallet balance sufficient (> 5 SUI)
+- [ ] DEEP token balance sufficient
+- [ ] Prepare fallback market data (in case DeepBook is unavailable)
+- [ ] Test Demo Mode panel with "Test Over-Limit" and "Test Normal" buttons
+- [ ] Test Guardrail Stress Test panel (all 5 tests should show BLOCKED)
 
 ### Security
 
-- [ ] `.env.local` 沒有被 commit
-- [ ] 私鑰沒有出現在前端程式碼中
-- [ ] API routes 有 input validation (Zod)
-- [ ] 錯誤訊息不洩漏敏感資訊
+- [ ] `.env.local` is NOT committed
+- [ ] No private keys in frontend code
+- [ ] All API routes have input validation (Zod)
+- [ ] Error messages do not leak sensitive information
+- [ ] `SPONSOR_PRIVATE_KEY` and `AGENT_PRIVATE_KEY` are not exposed to client
 
 ---
 
@@ -290,10 +351,12 @@ const CLOCK_OBJECT_ID = '0x6';
 
 // Network
 const TESTNET_RPC = 'https://fullnode.testnet.sui.io:443';
-const ZKLOGIN_PROVER = 'https://prover-dev.mystenlabs.com/v1';
+
+// Enoki ZK Prover
+const ENOKI_URL = 'https://api.enoki.mystenlabs.com/v1/zklogin/zkp';
 
 // DeepBook V3
-const SUI_DBUSDC_POOL = 'SUI_DBUSDC';
+const DEEPBOOK_POOL_KEY = 'SUI_DBUSDC';
 
 // Unit Conversion
 // 1 SUI = 1,000,000,000 MIST (1e9)
@@ -308,7 +371,7 @@ const ACTION_LIMIT_ORDER = 1;
 
 ## Related Documentation
 
-- [README.md](../README.md) -- 專案總覽
-- [CONTRIB.md](./CONTRIB.md) -- 開發工作流程
-- [TECH_SPEC.md](../TECH_SPEC.md) -- 完整技術規格
-- [CLAUDE.md](../CLAUDE.md) -- Claude Code 工作指引
+- [README.md](../README.md) -- Project overview
+- [CONTRIB.md](./CONTRIB.md) -- Development workflow
+- [TECH_SPEC.md](../TECH_SPEC.md) -- Full technical specification
+- [CLAUDE.md](../CLAUDE.md) -- Claude Code working guidelines

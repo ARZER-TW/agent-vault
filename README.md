@@ -31,6 +31,58 @@ Your AI agent receives an **AgentCap** (transferable NFT permission token) that 
 
 ---
 
+## Key Features
+
+### Multi-LLM Agent Runtime
+
+The AI agent supports three LLM providers with automatic detection:
+
+| Provider   | Model               | Env Variable       |
+|------------|---------------------|-------------------|
+| OpenAI     | gpt-4o              | `OPENAI_API_KEY`   |
+| Google     | gemini-2.0-flash    | `GEMINI_API_KEY`   |
+| Anthropic  | claude-sonnet-4-20250514     | `ANTHROPIC_API_KEY` |
+
+Set any one API key and the system auto-detects the provider. Override with `LLM_PROVIDER` env var.
+
+### Natural Language Strategy
+
+Tell the AI how to trade in plain language. Four presets included:
+- **Conservative DCA** -- Dollar-cost average with small fixed amounts
+- **Take Profit** -- Only swap when price exceeds a threshold
+- **Aggressive Trading** -- Use maximum per-tx amount for every swap
+- **Minimal Risk** -- Hold unless spread is extremely tight
+
+Or write your own custom strategy (up to 500 characters).
+
+### Auto-Run Mode
+
+Enable autonomous agent operation with configurable intervals (30s / 45s / 60s / 120s). The agent continuously:
+1. Fetches DeepBook V3 order book data
+2. Sends market snapshot to the configured LLM
+3. Validates the LLM's decision against vault policy
+4. Executes the trade via sponsored transaction
+5. Logs results in a terminal-style activity panel
+
+### Demo Mode
+
+Skip the LLM entirely and test policy enforcement directly. Use preset buttons to:
+- **Test Normal** -- Execute a withdrawal at 50% of per-tx limit (should succeed)
+- **Test Over-Limit** -- Attempt 2x per-tx limit (should be blocked by policy)
+
+### Guardrail Stress Test
+
+Run 5 adversarial scenarios against your vault's policy to verify all guardrails:
+1. **Budget Overflow** -- Exceed remaining budget
+2. **Per-TX Breach** -- Exceed per-transaction limit
+3. **Cooldown Bypass** -- Trade during cooldown period
+4. **Unauthorized Agent** -- Use a non-authorized AgentCap
+5. **Expired Policy** -- Trade after policy expiry
+
+All 5 tests should show BLOCKED for a correctly configured vault.
+
+---
+
 ## Architecture
 
 ```
@@ -41,7 +93,7 @@ Your AI agent receives an **AgentCap** (transferable NFT permission token) that 
            |
 +-----------------------------------------------------------+
 |  Backend (Next.js API Routes + Agent Runtime)             |
-|  Claude API | PTB Builder | Sponsored TX                  |
+|  Multi-LLM | PTB Builder | Sponsored TX                  |
 +-----------------------------------------------------------+
            |
 +-----------------------------------------------------------+
@@ -55,14 +107,14 @@ Your AI agent receives an **AgentCap** (transferable NFT permission token) that 
 1. **Owner** logs in via zkLogin (Google OAuth) -- no wallet extension needed
 2. **Owner** creates a Vault, deposits SUI, sets Policy, mints AgentCap
 3. **Agent** fetches market data from DeepBook V3 order book
-4. **Agent** sends market snapshot to Claude for analysis
-5. **Claude** returns structured `AgentDecision` (action + reasoning + confidence)
+4. **Agent** sends market snapshot to configured LLM for analysis
+5. **LLM** returns structured `AgentDecision` (action + reasoning + confidence)
 6. **Policy Checker** validates the intent off-chain (pre-flight, saves gas)
 7. **PTB Builder** composes atomic transaction: `agent_withdraw -> DeepBook swap`
 8. **Sponsored TX** executes on-chain -- user and agent pay zero gas
 9. **UI** displays TX hash with Sui Explorer link for on-chain verification
 
-**Demo Mode**: Skip step 3-5, inject forced amount to demonstrate policy enforcement directly (over-limit blocked, normal amount passes).
+**Demo Mode**: Skip steps 3-5, inject forced amount to demonstrate policy enforcement directly (over-limit blocked, normal amount passes).
 
 ---
 
@@ -75,7 +127,7 @@ Your AI agent receives an **AgentCap** (transferable NFT permission token) that 
 | State       | Zustand + React Query                   | zustand@5, @tanstack/react-query@5 |
 | Sui SDK     | @mysten/sui, @mysten/zklogin            | @mysten/sui@1.38.0                 |
 | DeepBook    | @mysten/deepbook-v3                     | v0.17.0                            |
-| AI          | OpenAI / Gemini / Claude (auto-detect)  | gpt-4o, gemini-2.0-flash, claude-sonnet-4-20250514 |
+| AI          | OpenAI / Gemini / Anthropic (auto-detect) | gpt-4o, gemini-2.0-flash, claude-sonnet-4-20250514 |
 | Contracts   | Sui Move                                | edition 2024.beta, Sui Testnet     |
 | Validation  | Zod                                     | zod@3.24.0                         |
 | Testing     | Vitest + sui move test                  | vitest@3.0.0                       |
@@ -120,7 +172,7 @@ Three transactions = three gas fees, three failure points, and a race condition 
 AgentVault users sign in with Google. No MetaMask. No seed phrase. No wallet extension.
 
 ```
-Google OAuth JWT -> ZK Proof -> Sui Address -> Sign Transactions
+Google OAuth JWT -> ZK Proof (Enoki) -> Sui Address -> Sign Transactions
 ```
 
 zkLogin is native to Sui's validator set -- the proof is verified on-chain by validators, not by a smart contract. This means zero extra gas cost for ZK verification, unlike EVM's ERC-4337 account abstraction which adds ~200k gas overhead per UserOp.
@@ -172,15 +224,22 @@ agent-vault/
 +-- app/                             # Next.js 14 App Router
 |   +-- page.tsx                     # Landing page (Vault Noir hero)
 |   +-- layout.tsx                   # Root layout with Providers
-|   +-- globals.css                  # Vault Noir design system (460 lines)
+|   +-- globals.css                  # Vault Noir design system
 |   +-- auth/callback/page.tsx       # zkLogin OAuth callback handler
 |   +-- vault/
 |   |   +-- page.tsx                 # Vault dashboard (list all vaults)
 |   |   +-- create/page.tsx          # Create vault form page
 |   |   +-- [id]/page.tsx            # Vault detail + agent runtime
 |   +-- api/
-|       +-- agent/run/route.ts       # POST: execute one agent cycle
+|       +-- agent/
+|       |   +-- run/route.ts         # POST: execute one agent cycle (market -> LLM -> policy -> TX)
+|       |   +-- demo-run/route.ts    # POST: demo mode (skip LLM, forced amount)
+|       |   +-- policy-test/route.ts # POST: guardrail stress test (5 adversarial scenarios)
+|       |   +-- address/route.ts     # GET: agent wallet address
 |       +-- vault/[id]/route.ts      # GET: fetch vault data
+|       +-- sponsor/
+|           +-- address/route.ts     # GET: sponsor wallet address
+|           +-- sign-and-execute/route.ts # POST: co-sign sponsored TX
 +-- lib/
 |   +-- constants.ts                 # Package ID, network, action types, unit conversion
 |   +-- sui/
@@ -190,19 +249,19 @@ agent-vault/
 |   |   +-- coins.ts                # Fetch SUI coin objects by owner
 |   +-- agent/
 |   |   +-- runtime.ts              # Agent cycle orchestrator (7-step pipeline)
-|   |   +-- claude-client.ts        # Claude API wrapper with system prompt
+|   |   +-- claude-client.ts        # Multi-LLM wrapper (OpenAI/Gemini/Anthropic) with system prompt
 |   |   +-- intent-parser.ts        # Zod-validated AgentDecision parsing
-|   |   +-- policy-checker.ts       # Off-chain policy pre-validation
+|   |   +-- policy-checker.ts       # Off-chain policy pre-validation (6 rules)
 |   |   +-- __tests__/
 |   |       +-- intent-parser.test.ts   # 9 tests
 |   |       +-- policy-checker.test.ts  # 11 tests
 |   +-- vault/
-|   |   +-- types.ts                # VaultData, Policy, AgentCapData, SwapParams
-|   |   +-- ptb-builder.ts          # 7 PTB builders (create, deposit, withdraw, swap, etc.)
-|   |   +-- service.ts              # On-chain vault queries (getVault, getOwnerCaps, etc.)
+|   |   +-- types.ts                # VaultData, Policy, AgentCapData, SwapParams, AgentLogEntry
+|   |   +-- ptb-builder.ts          # 9 PTB builders (create, deposit, depositFromGas, withdraw, updatePolicy, createAgentCap, revokeAgentCap, agentWithdraw, agentSwap)
+|   |   +-- service.ts              # On-chain vault queries (getVault, getOwnerCaps, getAgentCaps, getOwnedVaults, isAgentCapAuthorized, getRemainingBudget)
 |   +-- auth/
-|   |   +-- zklogin.ts              # Full zkLogin flow (begin, complete, sign)
-|   |   +-- sponsored-tx.ts         # Sponsored + agent transaction execution
+|   |   +-- zklogin.ts              # Full zkLogin flow (begin, complete, sign) via Enoki API
+|   |   +-- sponsored-tx.ts         # Sponsored TX + agent TX + direct zkLogin TX execution
 |   +-- store/
 |       +-- auth-store.ts           # Zustand auth state (address, keypair, zkProof)
 |       +-- vault-store.ts          # Zustand vault state (vaults, caps, agent logs)
@@ -210,9 +269,21 @@ agent-vault/
 |   +-- providers.tsx               # React Query provider
 |   +-- layout/header.tsx           # Sticky header with nav + login
 |   +-- auth/login-button.tsx       # Google zkLogin button
-|   +-- vault/vault-card.tsx        # Vault summary card with budget bar
-|   +-- vault/create-vault-form.tsx # Full vault creation form
-|   +-- agent/agent-activity-log.tsx # Terminal-style agent log viewer
+|   +-- ui/toast.tsx                # Toast notification system
+|   +-- vault/
+|   |   +-- vault-card.tsx          # Vault summary card with budget bar
+|   |   +-- create-vault-form.tsx   # Full vault creation form
+|   |   +-- owner-actions.tsx       # Deposit, withdraw, policy update, agent cap management
+|   |   +-- policy-row.tsx          # Policy parameter display row
+|   |   +-- stat-card.tsx           # Vault stat card component
+|   |   +-- demo-mode-panel.tsx     # Demo mode: forced amount + policy test
+|   |   +-- strategy-input.tsx      # Natural language strategy input with presets
+|   |   +-- auto-run-controls.tsx   # Auto-run mode with interval selector + countdown
+|   |   +-- guardrail-stress-test.tsx # 5 adversarial policy tests
+|   +-- agent/
+|       +-- agent-activity-log.tsx  # Terminal-style agent log viewer
++-- scripts/
+|   +-- test-deepbook.ts            # DeepBook V3 testnet diagnostic script
 +-- vitest.config.ts
 +-- tailwind.config.ts
 +-- tsconfig.json
@@ -229,7 +300,7 @@ agent-vault/
 - pnpm (recommended) or npm
 - Sui CLI (for contract deployment only)
 - Google Cloud OAuth Client ID (for zkLogin)
-- Anthropic API key (for Claude)
+- One LLM API key (OpenAI, Gemini, or Anthropic)
 
 ### 1. Install Dependencies
 
@@ -257,10 +328,16 @@ NEXT_PUBLIC_GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=your-client-secret
 NEXT_PUBLIC_REDIRECT_URI=http://localhost:3000/auth/callback
 
+# Enoki API (for zkLogin ZK proof)
+NEXT_PUBLIC_ENOKI_API_KEY=your-enoki-api-key
+
 # LLM API (set ONE -- auto-detects provider)
 OPENAI_API_KEY=sk-xxx          # or
 GEMINI_API_KEY=xxx             # or
 ANTHROPIC_API_KEY=sk-ant-xxx
+
+# Optional: force specific provider
+# LLM_PROVIDER=openai
 
 # Sponsor Wallet (pays gas for users)
 SPONSOR_PRIVATE_KEY=suiprivkey1xxx
@@ -285,6 +362,12 @@ pnpm vitest run
 
 # Move contract tests (15 tests)
 cd contracts && sui move test
+```
+
+### 5. Diagnose DeepBook
+
+```bash
+npx tsx scripts/test-deepbook.ts
 ```
 
 ---
@@ -373,16 +456,20 @@ The frontend uses the **Vault Noir** design system:
 | `/`                | Landing page          | Hero with tagline + how-it-works + tech stack |
 | `/vault`           | Vault dashboard       | List all user vaults with VaultCard   |
 | `/vault/create`    | Create vault form     | Coin selector + policy configuration  |
-| `/vault/[id]`      | Vault detail          | Stats, budget bar, policy, agent runtime |
+| `/vault/[id]`      | Vault detail          | Stats, budget bar, policy, agent runtime, demo mode, strategy, auto-run, guardrail stress test |
 | `/auth/callback`   | zkLogin callback      | Process OAuth token + ZK proof        |
 
 ### API Routes
 
-| Route                  | Method | Description                                         |
-|------------------------|--------|-----------------------------------------------------|
-| `/api/agent/run`       | POST   | Execute one agent cycle (market -> Claude -> policy -> TX) |
-| `/api/agent/demo-run`  | POST   | Demo mode: skip Claude, test policy with forced amount    |
-| `/api/vault/[id]`      | GET    | Fetch vault data from chain                         |
+| Route                           | Method | Description                                                     |
+|---------------------------------|--------|-----------------------------------------------------------------|
+| `/api/agent/run`                | POST   | Execute one agent cycle (market -> LLM -> policy -> TX)         |
+| `/api/agent/demo-run`           | POST   | Demo mode: skip LLM, test policy with forced amount             |
+| `/api/agent/policy-test`        | POST   | Guardrail stress test with 5 adversarial scenarios              |
+| `/api/agent/address`            | GET    | Return agent wallet Sui address                                 |
+| `/api/vault/[id]`              | GET    | Fetch vault data from chain                                     |
+| `/api/sponsor/address`          | GET    | Return sponsor wallet Sui address                               |
+| `/api/sponsor/sign-and-execute` | POST   | Co-sign and execute sponsored transaction                       |
 
 ---
 
@@ -390,28 +477,32 @@ The frontend uses the **Vault Noir** design system:
 
 - [TECH_SPEC.md](./TECH_SPEC.md) -- Full technical specification and design
 - [IMPLEMENTATION_PLAN.md](./IMPLEMENTATION_PLAN.md) -- 5-day development schedule
-- [docs/CONTRIB.md](./docs/CONTRIB.md) -- Development workflow, testing, environment setup
+- [docs/CONTRIB.md](./docs/CONTRIB.md) -- Development workflow, scripts, environment setup, testing
 - [docs/RUNBOOK.md](./docs/RUNBOOK.md) -- Deployment, operations, troubleshooting
 
 ---
 
 ## Status
 
-| Component               | Status             | Details                        |
-|-------------------------|--------------------|--------------------------------|
-| Move Contracts          | Deployed (Testnet) | 15/15 tests passing            |
-| PTB Builder             | Complete           | 7 transaction builders         |
-| DeepBook V3 Integration | Complete           | Order book + swap + quotes + fallback |
-| Agent Runtime           | Complete           | 7-step pipeline (market -> Claude -> policy -> TX execution) |
-| Policy Checker          | Complete           | 6 off-chain validation rules   |
-| Intent Parser           | Complete           | Zod-validated + code block extraction |
-| zkLogin                 | Complete           | Google OAuth + ZK prover       |
+| Component               | Status             | Details                                          |
+|-------------------------|--------------------|--------------------------------------------------|
+| Move Contracts          | Deployed (Testnet) | 15/15 tests passing                              |
+| PTB Builder             | Complete           | 9 transaction builders                           |
+| DeepBook V3 Integration | Complete           | Order book + swap + quotes + pool info + fallback |
+| Multi-LLM Runtime       | Complete           | OpenAI gpt-4o / Gemini 2.0 Flash / Anthropic Claude with auto-detect |
+| Agent Runtime           | Complete           | 7-step pipeline (market -> LLM -> policy -> TX execution) |
+| Policy Checker          | Complete           | 6 off-chain validation rules                     |
+| Intent Parser           | Complete           | Zod-validated + code block extraction            |
+| zkLogin                 | Complete           | Google OAuth + Enoki ZK prover                   |
 | Sponsored TX            | Complete           | Dual-signature: agent signs action, sponsor pays gas |
-| On-chain TX Execution   | Complete           | Sponsored TX with direct fallback |
-| Demo Mode               | Complete           | Forced-amount policy testing (skip Claude) |
-| Frontend                | Complete           | Vault Noir design, all pages   |
-| Unit Tests              | 20/20 passing      | Vitest (intent-parser + policy-checker) |
-| Contract Tests          | 15/15 passing      | sui move test                  |
+| On-chain TX Execution   | Complete           | Sponsored TX with direct fallback                |
+| Demo Mode               | Complete           | Forced-amount policy testing (skip LLM)          |
+| Natural Language Strategy | Complete         | 4 presets + custom strategy (up to 500 chars)    |
+| Auto-Run Mode           | Complete           | Configurable interval (30s/45s/60s/120s) with countdown |
+| Guardrail Stress Test   | Complete           | 5 adversarial scenarios (budget, per-tx, cooldown, unauthorized, expired) |
+| Frontend                | Complete           | Vault Noir design, all pages                     |
+| Unit Tests              | 20/20 passing      | Vitest (intent-parser + policy-checker)          |
+| Contract Tests          | 15/15 passing      | sui move test                                    |
 
 ---
 

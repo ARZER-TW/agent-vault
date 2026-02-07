@@ -2,7 +2,7 @@
 
 > 開發工作流程、測試程序、環境設定指南
 
-**Last Updated:** 2026-02-06
+**Last Updated:** 2026-02-07
 
 ---
 
@@ -11,17 +11,17 @@
 | Tool       | Version  | Purpose                          | Install                                |
 |------------|----------|----------------------------------|----------------------------------------|
 | Node.js    | >= 18    | JavaScript runtime               | https://nodejs.org/                    |
-| pnpm       | >= 8     | Package manager (推薦)           | `npm install -g pnpm`                  |
-| Sui CLI    | latest   | Move 合約編譯/部署/測試          | https://docs.sui.io/build/install      |
-| TypeScript | >= 5     | 型別檢查 (included in devDeps)   | Installed via pnpm                     |
+| pnpm       | >= 8     | Package manager (recommended)    | `npm install -g pnpm`                  |
+| Sui CLI    | latest   | Move contract build/deploy/test  | https://docs.sui.io/build/install      |
+| TypeScript | >= 5     | Type checking (included in devDeps) | Installed via pnpm                  |
 
 ### Optional
 
 | Tool              | Purpose                                     |
 |-------------------|---------------------------------------------|
-| Google Cloud Console | 建立 OAuth Client ID (zkLogin 用)        |
-| Anthropic Console | 取得 Claude API Key                         |
-| Sui Testnet Faucet | 為 Sponsor/Agent 錢包取得測試 SUI          |
+| Google Cloud Console | Create OAuth Client ID (for zkLogin)     |
+| OpenAI / Anthropic / Google AI Console | Obtain LLM API Key    |
+| Sui Testnet Faucet | Fund Sponsor/Agent wallets with test SUI   |
 
 ---
 
@@ -41,129 +41,180 @@ pnpm install
 cp .env.example .env.local
 ```
 
-必要環境變數：
+All environment variables reference:
 
-| Variable                        | Required | Description                                   |
-|---------------------------------|----------|-----------------------------------------------|
-| `NEXT_PUBLIC_SUI_NETWORK`       | Yes      | `testnet` (default) or `mainnet`              |
-| `NEXT_PUBLIC_PACKAGE_ID`        | Yes      | 部署後的合約 Package ID                      |
-| `NEXT_PUBLIC_GOOGLE_CLIENT_ID`  | Yes      | Google OAuth Client ID                        |
-| `GOOGLE_CLIENT_SECRET`          | Yes      | Google OAuth Client Secret                    |
-| `NEXT_PUBLIC_REDIRECT_URI`      | Yes      | OAuth callback URL                            |
-| `ANTHROPIC_API_KEY`             | Yes      | Claude API key (`sk-ant-...`)                 |
-| `SPONSOR_PRIVATE_KEY`           | Yes      | Sponsor 錢包私鑰 (代付 gas 用)               |
-| `AGENT_PRIVATE_KEY`             | Yes      | Agent 錢包私鑰 (執行交易用)                  |
+| Variable                        | Required | Scope        | Description                                                  |
+|---------------------------------|----------|--------------|--------------------------------------------------------------|
+| `NEXT_PUBLIC_SUI_NETWORK`       | Yes      | Client+Server | Sui network: `testnet` (default), `devnet`, or `mainnet`   |
+| `NEXT_PUBLIC_PACKAGE_ID`        | Yes      | Client+Server | Deployed Move contract Package ID                           |
+| `NEXT_PUBLIC_GOOGLE_CLIENT_ID`  | Yes      | Client       | Google OAuth 2.0 Client ID (for zkLogin)                     |
+| `GOOGLE_CLIENT_SECRET`          | Yes      | Server       | Google OAuth 2.0 Client Secret                               |
+| `NEXT_PUBLIC_REDIRECT_URI`      | Yes      | Client       | OAuth callback URL (default: `http://localhost:3000/auth/callback`) |
+| `NEXT_PUBLIC_ENOKI_API_KEY`     | Yes      | Client       | Mysten Enoki API key (for zkLogin ZK proof generation)       |
+| `OPENAI_API_KEY`                | One of three | Server   | OpenAI API key (`sk-...`). Model: `gpt-4o`                   |
+| `GEMINI_API_KEY`                | One of three | Server   | Google Gemini API key. Model: `gemini-2.0-flash`             |
+| `ANTHROPIC_API_KEY`             | One of three | Server   | Anthropic API key (`sk-ant-...`). Model: `claude-sonnet-4-20250514`      |
+| `LLM_PROVIDER`                  | No       | Server       | Force a specific LLM provider: `openai`, `gemini`, or `anthropic`. Auto-detects if unset. |
+| `SPONSOR_PRIVATE_KEY`           | Yes      | Server       | Sui Ed25519 private key for gas sponsorship (`suiprivkey1...`) |
+| `AGENT_PRIVATE_KEY`             | Yes      | Server       | Sui Ed25519 private key for agent trade execution (`suiprivkey1...`) |
 
-**安全注意**: `.env.local` 已在 `.gitignore` 中，絕對不要 commit 私鑰。
+**LLM Auto-Detection Priority:** If `LLM_PROVIDER` is not set, the system checks API keys in this order: `OPENAI_API_KEY` > `GEMINI_API_KEY` > `ANTHROPIC_API_KEY`. The first key found determines the provider.
 
-### 3. 取得 Testnet SUI
+**Security Warning**: `.env.local` is listed in `.gitignore`. Never commit private keys to version control.
 
-Sponsor 和 Agent 錢包需要 testnet SUI。使用 faucet：
+### 3. Generate Wallet Keys
+
+Sponsor and Agent wallets need testnet SUI:
 
 ```bash
-# 生成新的 keypair
+# Generate a new Ed25519 keypair
 sui keytool generate ed25519
 
-# 用 Sui CLI 領取 testnet SUI
+# Fund from Sui Testnet faucet
 sui client faucet --address <YOUR_ADDRESS>
 ```
 
-### 4. Google OAuth 設定
+### 4. Google OAuth Setup
 
-1. 前往 [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-2. 建立 OAuth 2.0 Client ID (Web application)
-3. 添加授權的重新導向 URI：`http://localhost:3000/auth/callback`
-4. 複製 Client ID 和 Secret 到 `.env.local`
+1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+2. Create an OAuth 2.0 Client ID (Web application type)
+3. Add authorized redirect URI: `http://localhost:3000/auth/callback`
+4. Copy Client ID and Secret to `.env.local`
+
+### 5. Enoki API Key Setup
+
+1. Go to [Mysten Enoki Portal](https://enoki.mystenlabs.com/)
+2. Create a project and obtain an API key
+3. Set `NEXT_PUBLIC_ENOKI_API_KEY` in `.env.local`
 
 ---
 
-## Development Workflow
+## Available Scripts
 
-### Available Scripts
+### npm/pnpm Scripts (package.json)
 
-| Command             | Description                         |
-|---------------------|-------------------------------------|
-| `pnpm dev`          | 啟動開發伺服器 (http://localhost:3000) |
-| `pnpm build`        | 建置 production bundle              |
-| `pnpm start`        | 啟動 production 伺服器              |
-| `pnpm lint`         | ESLint 檢查                         |
-| `pnpm vitest run`   | 執行所有 TypeScript 單元測試        |
-| `pnpm vitest`       | Watch mode 執行測試                 |
+| Command             | Description                                   |
+|---------------------|-----------------------------------------------|
+| `pnpm dev`          | Start Next.js dev server (http://localhost:3000) |
+| `pnpm build`        | Production build                              |
+| `pnpm start`        | Start production server                       |
+| `pnpm lint`         | ESLint check                                  |
+
+### Test Commands
+
+| Command                                                 | Description                      |
+|---------------------------------------------------------|----------------------------------|
+| `pnpm vitest run`                                       | Run all TypeScript unit tests    |
+| `pnpm vitest`                                           | Watch mode unit tests            |
+| `pnpm vitest run lib/agent/__tests__/policy-checker.test.ts` | Run specific test file     |
+| `cd contracts && sui move test`                         | Run Move contract tests (15 tests) |
 
 ### Move Contract Commands
 
 ```bash
 cd contracts
 
-# 編譯
+# Build
 sui move build
 
-# 測試 (15 tests)
+# Test (15 tests)
 sui move test
 
-# 部署到 Testnet
+# Deploy to Testnet
 sui client publish --gas-budget 100000000
 
-# 部署後記錄 Package ID 到 .env.local
+# After deployment, update NEXT_PUBLIC_PACKAGE_ID in .env.local
 ```
+
+### Utility Scripts
+
+| Command                          | Description                                |
+|----------------------------------|--------------------------------------------|
+| `npx tsx scripts/test-deepbook.ts` | Test DeepBook V3 connectivity and pool status |
+
+---
+
+## Development Workflow
 
 ### Git Workflow
 
-**強制規則**：每完成一個功能或檔案就要 commit + push。
+**Mandatory Rule**: Commit and push after every completed feature or file.
 
 ```bash
-# Commit 格式
+# Commit format
 git add <specific-files>
 git commit -m "type: description"
 git push
 
-# type 類型：
-# feat     - 新功能
-# fix      - 修復 bug
-# docs     - 文件更新
-# refactor - 重構
-# test     - 測試
-# chore    - 維護工作
+# Types:
+# feat     - New feature
+# fix      - Bug fix
+# docs     - Documentation update
+# refactor - Code restructuring
+# test     - Test addition/modification
+# chore    - Maintenance
 ```
 
-**不要**累積大量更動才一次 commit。
+Do NOT accumulate large changes before committing.
+
+### Local Development Cycle
+
+1. Start dev server: `pnpm dev`
+2. Make code changes
+3. Verify in browser at `http://localhost:3000`
+4. Run tests: `pnpm vitest run`
+5. Commit and push
 
 ---
 
 ## Project Architecture
 
-### Module Dependencies
+### Module Dependency Graph
 
 ```
 app/ (pages + API routes)
   |
   +-- components/ (React UI)
   |     |
-  +-- lib/store/ (Zustand state)
+  +-- lib/store/ (Zustand state management)
   |     |
-  +-- lib/agent/ (AI runtime)
+  +-- lib/agent/ (AI agent runtime)
   |     |     |
   |     |     +-- lib/vault/service.ts (on-chain queries)
-  |     |     +-- lib/sui/market.ts (DeepBook data)
-  |     |     +-- Claude API (external)
+  |     |     +-- lib/sui/market.ts (DeepBook market data)
+  |     |     +-- LLM API (OpenAI / Gemini / Anthropic)
   |     |
-  +-- lib/vault/ptb-builder.ts (transaction construction)
+  +-- lib/vault/ptb-builder.ts (Programmable Transaction Block construction)
   |     |
-  +-- lib/auth/ (zkLogin + sponsored tx)
+  +-- lib/auth/ (zkLogin + Sponsored TX)
   |     |
-  +-- lib/sui/ (Sui/DeepBook clients)
+  +-- lib/sui/ (SuiClient + DeepBookClient singletons)
   |     |
-  +-- lib/constants.ts (shared config)
+  +-- lib/constants.ts (shared configuration)
 ```
+
+### API Routes
+
+| Route                      | Method | Purpose                                                     |
+|----------------------------|--------|-------------------------------------------------------------|
+| `/api/agent/run`           | POST   | Execute one agent cycle (market -> LLM -> policy -> TX)     |
+| `/api/agent/demo-run`      | POST   | Demo mode: skip LLM, test policy with forced amount         |
+| `/api/agent/policy-test`   | POST   | Guardrail stress test: adversarial policy violation attempts |
+| `/api/agent/address`       | GET    | Return agent wallet address                                 |
+| `/api/vault/[id]`          | GET    | Fetch vault data from chain                                 |
+| `/api/sponsor/address`     | GET    | Return sponsor wallet address                               |
+| `/api/sponsor/sign-and-execute` | POST | Co-sign and execute sponsored transaction             |
 
 ### Key Design Decisions
 
-1. **Balance<SUI> not Coin** -- 合約使用 `Balance<SUI>` 儲存資金，效能更好
-2. **AgentCap as key, store** -- 讓 AgentCap 可轉移給不同地址
-3. **Shared Vault object** -- 使用 `transfer::share_object` 讓任何人可讀取
-4. **Off-chain policy pre-check** -- 在 `policy-checker.ts` 先驗證，避免浪費 gas
-5. **BigInt for amounts** -- TypeScript 端所有金額使用 `bigint` 避免精度問題
-6. **MIST as unit** -- 合約內部統一使用 MIST (1 SUI = 1,000,000,000 MIST)
+1. **Balance<SUI> not Coin** -- Contract uses `Balance<SUI>` for fund storage (more efficient)
+2. **AgentCap as key, store** -- Makes AgentCap transferable to different addresses
+3. **Shared Vault object** -- Uses `transfer::share_object` for universal readability
+4. **Off-chain policy pre-check** -- Validates in `policy-checker.ts` before sending TX (saves gas)
+5. **BigInt for amounts** -- All monetary amounts in TypeScript use `bigint` to avoid precision issues
+6. **MIST as unit** -- Contract internally uses MIST (1 SUI = 1,000,000,000 MIST)
+7. **Multi-LLM support** -- Auto-detects provider from API keys; supports OpenAI, Gemini, Anthropic
+8. **Sponsored TX with fallback** -- Tries sponsored execution first, falls back to agent-paid gas
 
 ---
 
@@ -171,57 +222,62 @@ app/ (pages + API routes)
 
 ### TypeScript Tests (Vitest)
 
-```bash
-# 執行所有測試
-pnpm vitest run
+Current test coverage:
 
-# Watch mode
-pnpm vitest
+| Test File                   | Tests | Coverage Area                                    |
+|-----------------------------|-------|--------------------------------------------------|
+| `intent-parser.test.ts`     | 9     | JSON parsing, Zod validation, code block handling |
+| `policy-checker.test.ts`    | 11    | All 6 policy rules boundary conditions           |
 
-# 執行特定測試檔
-pnpm vitest run lib/agent/__tests__/policy-checker.test.ts
-```
+Test cases (intent-parser):
 
-目前的測試覆蓋範圍：
+- Parse valid JSON response
+- Parse hold action (no params)
+- Parse JSON inside markdown code block
+- Parse JSON inside plain code block
+- Reject invalid action type
+- Reject out-of-range confidence
+- Reject empty reasoning
+- Reject non-numeric amount string
+- Reject non-JSON input
 
-| Test File                   | Tests | Coverage Area                            |
-|-----------------------------|-------|------------------------------------------|
-| `intent-parser.test.ts`     | 9     | JSON 解析、Zod 驗證、code block 處理    |
-| `policy-checker.test.ts`    | 11    | 所有 6 個 policy 規則的邊界條件          |
+Test cases (policy-checker):
 
-測試案例清單 (intent-parser):
+- Allow valid operation within all limits
+- Reject zero amount
+- Reject expired policy
+- Reject operation during cooldown
+- Allow operation after cooldown elapsed
+- Skip cooldown check for first transaction
+- Reject amount exceeding per-tx limit
+- Reject amount exceeding remaining budget
+- Reject non-whitelisted action type
+- Reject insufficient balance
 
-- 解析有效 JSON response
-- 解析 hold action (無 params)
-- 解析 markdown code block 中的 JSON
-- 解析 plain code block 中的 JSON
-- 拒絕無效 action type
-- 拒絕超出範圍的 confidence
-- 拒絕空的 reasoning
-- 拒絕非數字的 amount string
-- 拒絕非 JSON 輸入
-
-測試案例清單 (policy-checker):
-
-- 允許在所有限制內的有效操作
-- 拒絕零金額
-- 拒絕已過期的 policy
-- 拒絕在 cooldown 期間的操作
-- 允許 cooldown 結束後的操作
-- 跳過第一筆交易的 cooldown 檢查
-- 拒絕超過 per-tx 限制的金額
-- 拒絕超過剩餘預算的金額
-- 拒絕非白名單的 action type
-- 拒絕餘額不足
-
-### Move Contract Tests
+### Move Contract Tests (15/15 passing)
 
 ```bash
 cd contracts
 sui move test
 ```
 
-15 個測試涵蓋所有合約功能和 9 個錯誤碼的觸發條件。
+Tests cover all contract functions and all 9 error code trigger conditions:
+
+- `test_create_vault` -- Vault creation with initial deposit and policy
+- `test_deposit` -- Owner deposits additional funds
+- `test_withdraw_all` -- Owner withdraws all funds
+- `test_create_agent_cap` -- Minting AgentCap to agent address
+- `test_agent_withdraw_success` -- Happy-path agent withdrawal
+- `test_agent_withdraw_budget_exceeded` -- Total budget enforcement
+- `test_agent_withdraw_per_tx_exceeded` -- Per-transaction limit enforcement
+- `test_agent_withdraw_expired` -- Expiry enforcement
+- `test_agent_withdraw_cooldown` -- Cooldown enforcement
+- `test_agent_withdraw_not_whitelisted` -- Action whitelist enforcement
+- `test_agent_withdraw_revoked_cap` -- Revoked cap rejection
+- `test_revoke_agent_cap` -- Cap revocation flow
+- `test_update_policy` -- Policy update with new parameters
+- `test_agent_withdraw_zero_amount` -- Zero amount rejection
+- `test_agent_withdraw_multiple_with_cooldown` -- Multi-withdrawal with cooldown respect
 
 ---
 
@@ -229,24 +285,26 @@ sui move test
 
 ### TypeScript
 
-- 所有金額使用 `bigint`，不使用 `number`
-- 使用 `zod` 驗證所有外部輸入 (API request bodies, Claude responses)
-- 路徑別名：`@/` 對應專案根目錄
-- Immutable patterns：不直接修改 state，使用展開運算子或 Zustand set
-- 錯誤處理：所有 async 函式使用 try/catch，提供有意義的錯誤訊息
+- All monetary amounts use `bigint`, never `number`
+- Use `zod` to validate all external inputs (API request bodies, LLM responses)
+- Path alias: `@/` maps to project root
+- Immutable patterns: no direct state mutation; use spread operator or Zustand `set`
+- Error handling: all async functions use try/catch with meaningful error messages
+- Unit conversion helpers in `lib/constants.ts`: `suiToMist()`, `mistToSui()`
 
 ### Move
 
-- 錯誤碼常數定義：`const E_xxx: u64 = n`
-- 使用 `public(package)` 限制跨模組內部函式
-- Shared objects 使用 `transfer::share_object`
-- Owned objects 使用 `transfer::transfer`
+- Error code constants: `const E_xxx: u64 = n`
+- Use `public(package)` for cross-module internal functions
+- Shared objects: `transfer::share_object`
+- Owned objects: `transfer::transfer`
+- Fund storage: `Balance<SUI>` (not `Coin`)
 
 ### Styling
 
-- Tailwind CSS utility classes (no inline styles unless dynamic)
-- 自定義設計 token 在 `globals.css` :root 中定義
-- 使用 `glass-card`, `btn-primary`, `btn-ghost` 等預定義 class
+- Tailwind CSS utility classes (no inline styles unless dynamic values)
+- Custom design tokens defined in `globals.css` `:root`
+- Predefined classes: `glass-card`, `btn-primary`, `btn-ghost`, `vault-input`
 - Font hierarchy: Syne (headings) > DM Sans (body) > JetBrains Mono (code/data)
 
 ---
@@ -255,30 +313,38 @@ sui move test
 
 ### Adding a New Policy Rule
 
-1. 在 `contracts/sources/agent_vault.move` 的 `Policy` struct 添加欄位
-2. 在 `agent_withdraw` 函式中添加驗證邏輯
-3. 在 `agent_vault_tests.move` 添加正面和負面測試
-4. 在 `lib/vault/types.ts` 更新 `Policy` interface
-5. 在 `lib/agent/policy-checker.ts` 添加對應的 off-chain 檢查
-6. 在 `lib/agent/__tests__/policy-checker.test.ts` 添加測試
-7. 在 `lib/vault/service.ts` 的 `parsePolicy` 中添加欄位解析
-8. 在 `lib/vault/ptb-builder.ts` 的 `buildCreateVault` / `buildUpdatePolicy` 中添加參數
-9. 在 `components/vault/create-vault-form.tsx` 添加 UI 欄位
+1. Add field to `Policy` struct in `contracts/sources/agent_vault.move`
+2. Add validation logic in `agent_withdraw` function
+3. Add positive and negative tests in `agent_vault_tests.move`
+4. Update `Policy` interface in `lib/vault/types.ts`
+5. Add corresponding off-chain check in `lib/agent/policy-checker.ts`
+6. Add tests in `lib/agent/__tests__/policy-checker.test.ts`
+7. Add field parsing in `lib/vault/service.ts` (`parsePolicy`)
+8. Add parameter in `lib/vault/ptb-builder.ts` (`buildCreateVault` / `buildUpdatePolicy`)
+9. Add UI field in `components/vault/create-vault-form.tsx`
 
 ### Adding a New API Route
 
-1. 在 `app/api/` 下建立 `route.ts`
-2. 使用 Zod schema 驗證 request body
-3. 返回 `{ success: boolean, data?: T, error?: string }` 格式
-4. 處理所有錯誤（Zod validation、runtime errors）
+1. Create `route.ts` under `app/api/`
+2. Define Zod schema for request body validation
+3. Return `{ success: boolean, data?: T, error?: string }` format
+4. Handle all error types (Zod validation errors, runtime errors)
 
 ### Adding a New Page
 
-1. 在 `app/` 下建立資料夾和 `page.tsx`
-2. 使用 `<Header />` 元件作為頁面頂部
-3. 如果需要 client-side state，加上 `"use client"` 指令
-4. 使用 Zustand stores (`useAuthStore`, `useVaultStore`)
-5. 使用 glass-card 和其他 Vault Noir 設計元件
+1. Create directory and `page.tsx` under `app/`
+2. Use `<Header />` component at page top
+3. Add `"use client"` directive if client-side state is needed
+4. Use Zustand stores (`useAuthStore`, `useVaultStore`)
+5. Use glass-card and other Vault Noir design components
+
+### Adding a New LLM Provider
+
+1. Add API key detection in `lib/agent/claude-client.ts` (`detectProvider`)
+2. Implement `callNewProvider()` function following existing pattern
+3. Add provider to `MODELS` and `PROVIDER_CALLERS` maps
+4. Update `.env.example` with new key variable
+5. Update this document's environment variables table
 
 ---
 
@@ -286,32 +352,37 @@ sui move test
 
 ### "Missing zkLogin session data"
 
-ephemeral keypair 儲存在 `sessionStorage`，關閉瀏覽器分頁後會遺失。重新登入即可。
+Ephemeral keypair is stored in `sessionStorage` and is lost when the browser tab closes. Log in again.
 
 ### "SPONSOR_PRIVATE_KEY is not set"
 
-確認 `.env.local` 中有設定 `SPONSOR_PRIVATE_KEY`，且是有效的 Sui 私鑰格式 (`suiprivkey1...`)。
+Confirm `.env.local` contains `SPONSOR_PRIVATE_KEY` with a valid Sui private key format (`suiprivkey1...`).
+
+### "No LLM API key found"
+
+Set at least one of: `OPENAI_API_KEY`, `GEMINI_API_KEY`, `ANTHROPIC_API_KEY` in `.env.local`.
 
 ### "Vault not found: 0x..."
 
-Vault ID 可能來自不同的 network（devnet vs testnet）。確認 `NEXT_PUBLIC_SUI_NETWORK` 設定正確。
+Vault ID may be from a different network (devnet vs testnet). Confirm `NEXT_PUBLIC_SUI_NETWORK` is correct.
 
 ### Move contract build fails
 
-確認 Sui CLI 版本與合約的 `edition = "2024.beta"` 相容。使用 `sui --version` 檢查。
+Confirm Sui CLI version is compatible with `edition = "2024.beta"`. Check with `sui --version`.
 
 ### DeepBook swap fails
 
-1. 確認 Agent 地址持有少量 DEEP token
-2. 確認 `minOut` 沒有設置過高
-3. 確認 Testnet pool 有足夠流動性（可能需要自己掛單）
+1. Confirm Agent address holds DEEP tokens (required for fees)
+2. Confirm `minOut` is not set too high
+3. Confirm Testnet pool has sufficient liquidity (may need to place counterparty orders)
+4. Run `npx tsx scripts/test-deepbook.ts` to diagnose pool status
 
 ---
 
 ## Related Documentation
 
-- [README.md](../README.md) -- 專案總覽
-- [TECH_SPEC.md](../TECH_SPEC.md) -- 完整技術規格
-- [IMPLEMENTATION_PLAN.md](../IMPLEMENTATION_PLAN.md) -- 實作計畫
-- [RUNBOOK.md](./RUNBOOK.md) -- 部署與維運
-- [CLAUDE.md](../CLAUDE.md) -- Claude Code 工作指引
+- [README.md](../README.md) -- Project overview
+- [TECH_SPEC.md](../TECH_SPEC.md) -- Full technical specification
+- [IMPLEMENTATION_PLAN.md](../IMPLEMENTATION_PLAN.md) -- Implementation plan
+- [RUNBOOK.md](./RUNBOOK.md) -- Deployment and operations
+- [CLAUDE.md](../CLAUDE.md) -- Claude Code working guidelines
