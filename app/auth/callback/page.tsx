@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/lib/store/auth-store";
 import { completeZkLogin, deriveUserSalt } from "@/lib/auth/zklogin";
@@ -19,8 +19,13 @@ export default function AuthCallbackPage() {
   const { login } = useAuthStore();
   const [status, setStatus] = useState("processing");
   const [message, setMessage] = useState("Processing login...");
+  const hasRun = useRef(false);
 
   useEffect(() => {
+    // Prevent React 18 Strict Mode double-mount from firing twice
+    if (hasRun.current) return;
+    hasRun.current = true;
+
     async function handleCallback() {
       try {
         const hash = window.location.hash.substring(1);
@@ -71,6 +76,14 @@ export default function AuthCallbackPage() {
 
     handleCallback();
   }, [login, router]);
+
+  function handleRetry() {
+    hasRun.current = false;
+    setStatus("processing");
+    setMessage("Retrying login...");
+    // Re-trigger by navigating to same page (forces re-mount)
+    window.location.reload();
+  }
 
   const config = statusConfig[status] ?? statusConfig.processing;
 
@@ -123,6 +136,15 @@ export default function AuthCallbackPage() {
             {message}
           </p>
         </div>
+
+        {status === "error" && (
+          <button
+            onClick={handleRetry}
+            className="mt-6 btn-primary text-sm"
+          >
+            Retry
+          </button>
+        )}
       </div>
     </div>
   );

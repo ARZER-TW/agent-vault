@@ -6,6 +6,8 @@ import {
   jwtToAddress,
   genAddressSeed,
   getZkLoginSignature,
+  decodeJwt,
+  computeZkLoginAddressFromSeed,
 } from "@mysten/sui/zklogin";
 import type { ZkLoginSignatureInputs } from "@mysten/sui/zklogin";
 import { getSuiClient } from "@/lib/sui/client";
@@ -14,7 +16,13 @@ import { SUI_NETWORK } from "@/lib/constants";
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
 const REDIRECT_URI =
   process.env.NEXT_PUBLIC_REDIRECT_URI ?? "http://localhost:3000/auth/callback";
-const PROVER_URL =
+
+// Enoki API (recommended, works for testnet/mainnet)
+const ENOKI_API_KEY = process.env.NEXT_PUBLIC_ENOKI_API_KEY ?? "";
+const ENOKI_URL = "https://api.enoki.mystenlabs.com/v1/zklogin/zkp";
+
+// Legacy prover (fallback only)
+const LEGACY_PROVER_URL =
   SUI_NETWORK === "mainnet"
     ? "https://prover.mystenlabs.com/v1"
     : "https://prover-dev.mystenlabs.com/v1";
@@ -74,6 +82,85 @@ export async function beginZkLogin(): Promise<string> {
 }
 
 /**
+ * Fetch ZK proof via Enoki API.
+ */
+async function fetchProofEnoki(params: {
+  jwt: string;
+  ephemeralPublicKey: string;
+  maxEpoch: number;
+  randomness: string;
+  salt: string;
+}): Promise<ZkLoginSignatureInputs> {
+  const response = await fetch(ENOKI_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${ENOKI_API_KEY}`,
+      "zklogin-jwt": params.jwt,
+    },
+    body: JSON.stringify({
+      network: SUI_NETWORK,
+      ephemeralPublicKey: params.ephemeralPublicKey,
+      maxEpoch: params.maxEpoch,
+      randomness: params.randomness,
+      salt: params.salt,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Enoki prover error (${response.status}): ${errorText}`);
+  }
+
+  const json = await response.json();
+  return json.data as ZkLoginSignatureInputs;
+}
+
+/**
+ * Fetch ZK proof via legacy Mysten prover (fallback).
+ */
+async function fetchProofLegacy(params: {
+  jwt: string;
+  extendedEphemeralPublicKey: string;
+  maxEpoch: number;
+  randomness: string;
+  salt: string;
+}): Promise<ZkLoginSignatureInputs> {
+  let lastError = "";
+  const MAX_RETRIES = 3;
+
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const response = await fetch(LEGACY_PROVER_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jwt: params.jwt,
+        extendedEphemeralPublicKey: params.extendedEphemeralPublicKey,
+        maxEpoch: params.maxEpoch,
+        jwtRandomness: params.randomness,
+        salt: params.salt,
+        keyClaimName: "sub",
+      }),
+    });
+
+    if (response.ok) {
+      return (await response.json()) as ZkLoginSignatureInputs;
+    }
+
+    lastError = await response.text();
+    const isTransient =
+      lastError.includes("fetch failed") ||
+      response.status === 429 ||
+      response.status >= 500;
+
+    if (!isTransient || attempt === MAX_RETRIES - 1) break;
+    await new Promise((r) => setTimeout(r, 6000));
+  }
+
+  throw new Error(`Legacy prover error: ${lastError}`);
+}
+
+/**
  * Step 2: Complete login after OAuth callback.
  * Takes the JWT from the URL hash, fetches ZK proof, derives address.
  */
@@ -98,31 +185,80 @@ export async function completeZkLogin(params: {
   // Derive Sui address
   const address = jwtToAddress(jwt, userSalt);
 
-  // Get extended ephemeral public key for prover
+  // Get ephemeral public key in both formats
   const extendedEphemeralPublicKey = getExtendedEphemeralPublicKey(
     ephemeralKeypair.getPublicKey(),
   );
 
-  // Fetch ZK proof from Mysten prover
-  const proofResponse = await fetch(PROVER_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
+  // Decode JWT for addressSeed computation
+  const decoded = decodeJwt(jwt);
+  const aud = typeof decoded.aud === "string" ? decoded.aud : decoded.aud[0];
+
+  // Fetch ZK proof -- prefer legacy prover for consistent addressSeed control,
+  // fallback to Enoki if legacy fails
+  let zkProof: ZkLoginSignatureInputs;
+  let finalAddress = address;
+  let usedEnoki = false;
+
+  try {
+    zkProof = await fetchProofLegacy({
       jwt,
       extendedEphemeralPublicKey,
       maxEpoch,
-      jwtRandomness: randomness,
+      randomness,
       salt: userSalt,
-      keyClaimName: "sub",
-    }),
-  });
+    });
 
-  if (!proofResponse.ok) {
-    const errorText = await proofResponse.text();
-    throw new Error(`ZK prover error: ${errorText}`);
+    // Legacy prover: compute our own addressSeed (matches our salt)
+    const computedSeed = genAddressSeed(
+      BigInt(userSalt),
+      "sub",
+      decoded.sub,
+      aud,
+    ).toString();
+
+    zkProof = { ...zkProof, addressSeed: computedSeed };
+    console.log("[zklogin] Legacy prover: addressSeed:", computedSeed);
+  } catch (legacyError) {
+    console.warn("[zklogin] Legacy prover failed, trying Enoki:", legacyError);
+
+    if (!ENOKI_API_KEY) {
+      throw legacyError;
+    }
+
+    zkProof = await fetchProofEnoki({
+      jwt,
+      ephemeralPublicKey: extendedEphemeralPublicKey,
+      maxEpoch,
+      randomness,
+      salt: userSalt,
+    });
+    usedEnoki = true;
+
+    // Enoki returns its own addressSeed that may differ from ours.
+    // The ZK proof is bound to Enoki's addressSeed, so we MUST use it.
+    if (zkProof.addressSeed) {
+      finalAddress = computeZkLoginAddressFromSeed(
+        BigInt(zkProof.addressSeed),
+        decoded.iss,
+      );
+      console.log("[zklogin] Enoki addressSeed:", zkProof.addressSeed);
+      console.log("[zklogin] Enoki-derived address:", finalAddress);
+    } else {
+      // Enoki didn't return addressSeed, compute our own
+      const computedSeed = genAddressSeed(
+        BigInt(userSalt),
+        "sub",
+        decoded.sub,
+        aud,
+      ).toString();
+      zkProof = { ...zkProof, addressSeed: computedSeed };
+    }
   }
 
-  const zkProof = (await proofResponse.json()) as ZkLoginSignatureInputs;
+  console.log("[zklogin] Prover:", usedEnoki ? "Enoki" : "Legacy");
+  console.log("[zklogin] Final address:", finalAddress);
+  console.log("[zklogin] addressSeed:", zkProof.addressSeed);
 
   // Store salt for future sessions
   if (typeof window !== "undefined") {
@@ -130,7 +266,7 @@ export async function completeZkLogin(params: {
   }
 
   return {
-    address,
+    address: finalAddress,
     ephemeralKeypair,
     maxEpoch,
     randomness,

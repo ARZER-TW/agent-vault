@@ -5,9 +5,7 @@ let client: SuiClient | null = null;
 
 export function getSuiClient(): SuiClient {
   if (!client) {
-    client = new SuiClient({
-      url: getFullnodeUrl(SUI_NETWORK),
-    });
+    client = new SuiClient({ url: getFullnodeUrl(SUI_NETWORK) });
   }
   return client;
 }

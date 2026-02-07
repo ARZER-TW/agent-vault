@@ -11,15 +11,19 @@ export interface CoinItem {
 export async function getSuiCoins(ownerAddress: string): Promise<CoinItem[]> {
   const client = getSuiClient();
   const coins: CoinItem[] = [];
-  let cursor: string | null | undefined = undefined;
+  let cursor: string | null = null;
   let hasNext = true;
 
   while (hasNext) {
-    const page = await client.getCoins({
+    const params: { owner: string; coinType: string; cursor?: string } = {
       owner: ownerAddress,
       coinType: "0x2::sui::SUI",
-      cursor,
-    });
+    };
+    if (cursor) {
+      params.cursor = cursor;
+    }
+
+    const page = await client.getCoins(params);
 
     for (const coin of page.data) {
       coins.push({
@@ -28,7 +32,7 @@ export async function getSuiCoins(ownerAddress: string): Promise<CoinItem[]> {
       });
     }
 
-    cursor = page.nextCursor;
+    cursor = page.nextCursor ?? null;
     hasNext = page.hasNextPage;
   }
 

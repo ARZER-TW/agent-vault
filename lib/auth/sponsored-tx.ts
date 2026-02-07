@@ -1,18 +1,17 @@
 import type { Transaction } from "@mysten/sui/transactions";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
+import type { ZkLoginSignatureInputs } from "@mysten/sui/zklogin";
 import { getSuiClient } from "@/lib/sui/client";
 import { buildZkLoginSignature } from "./zklogin";
-import type { ZkLoginSignatureInputs } from "@mysten/sui/zklogin";
 
 /**
  * Execute a sponsored transaction where the sponsor pays gas.
  *
- * Flow:
- * 1. Set sponsor as gas owner on the transaction
- * 2. Serialize the transaction bytes
- * 3. Sponsor signs the gas portion (with sponsor keypair)
- * 4. User signs the action portion (with ephemeral keypair + zkLogin)
- * 5. Execute with both signatures
+ * Client-side flow:
+ * 1. Fetch sponsor address from server
+ * 2. Build and sign transaction with ephemeral key
+ * 3. Wrap ephemeral signature in zkLogin envelope
+ * 4. Send to server for sponsor co-signing and execution
  */
 export async function executeSponsoredTransaction(params: {
   transaction: Transaction;
@@ -24,47 +23,96 @@ export async function executeSponsoredTransaction(params: {
   const { transaction, senderAddress, ephemeralKeypair, zkProof, maxEpoch } =
     params;
 
-  const sponsorKeyStr = process.env.SPONSOR_PRIVATE_KEY;
-  if (!sponsorKeyStr) {
-    throw new Error("SPONSOR_PRIVATE_KEY is not set");
-  }
-
-  const sponsorKeypair = Ed25519Keypair.fromSecretKey(sponsorKeyStr);
   const client = getSuiClient();
 
-  // Set sender and gas owner
+  // Fetch sponsor address from server
+  const sponsorAddr = await fetchSponsorAddress();
+
+  // Set sender (zkLogin user) and gas owner (sponsor)
   transaction.setSender(senderAddress);
-  transaction.setGasOwner(sponsorKeypair.getPublicKey().toSuiAddress());
+  transaction.setGasOwner(sponsorAddr);
 
-  // Build the transaction bytes
-  const txBytes = await transaction.build({ client });
+  // Use Transaction.sign() - the SDK-recommended approach
+  // This builds the TX bytes and signs with the ephemeral key
+  const { bytes: txBytesBase64, signature: ephemeralSignature } =
+    await transaction.sign({ client, signer: ephemeralKeypair });
 
-  // Sponsor signs gas portion
-  const sponsorSignature = await sponsorKeypair.sign(txBytes);
-  const sponsorSigBase64 = btoa(
-    String.fromCharCode(...sponsorSignature),
-  );
-
-  // User (ephemeral key) signs action portion
-  const userSignature = await ephemeralKeypair.sign(txBytes);
-  const userSigBase64 = btoa(
-    String.fromCharCode(...userSignature),
-  );
-
-  // Build zkLogin signature wrapping the ephemeral signature
+  // Wrap the ephemeral signature in a zkLogin envelope
   const zkLoginSig = buildZkLoginSignature({
-    userSignature: userSigBase64,
+    userSignature: ephemeralSignature,
     zkProof,
     maxEpoch,
   });
 
-  // Execute with both signatures
+  // Send to sponsor API for co-signing and execution
+  const response = await fetch("/api/sponsor/sign-and-execute", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      txBytes: txBytesBase64,
+      userSignature: zkLoginSig,
+    }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error ?? `Sponsor API error (${response.status})`);
+  }
+
+  const { digest } = await response.json();
+  return digest;
+}
+
+/**
+ * Execute a NON-sponsored transaction where the user pays their own gas.
+ * Used for debugging to isolate zkLogin signature issues from sponsor issues.
+ */
+export async function executeDirectZkLoginTransaction(params: {
+  transaction: Transaction;
+  senderAddress: string;
+  ephemeralKeypair: Ed25519Keypair;
+  zkProof: ZkLoginSignatureInputs;
+  maxEpoch: number;
+}): Promise<string> {
+  const { transaction, senderAddress, ephemeralKeypair, zkProof, maxEpoch } =
+    params;
+
+  const client = getSuiClient();
+
+  // User pays own gas - no sponsor
+  transaction.setSender(senderAddress);
+
+  // Sign with ephemeral key
+  const { bytes: txBytesBase64, signature: ephemeralSignature } =
+    await transaction.sign({ client, signer: ephemeralKeypair });
+
+  // Wrap in zkLogin
+  const zkLoginSig = buildZkLoginSignature({
+    userSignature: ephemeralSignature,
+    zkProof,
+    maxEpoch,
+  });
+
+  // Execute directly with single zkLogin signature
   const result = await client.executeTransactionBlock({
-    transactionBlock: txBytes,
-    signature: [zkLoginSig, sponsorSigBase64],
+    transactionBlock: txBytesBase64,
+    signature: zkLoginSig,
+    options: { showEffects: true },
   });
 
   return result.digest;
+}
+
+/**
+ * Fetch the sponsor wallet address from the server.
+ */
+async function fetchSponsorAddress(): Promise<string> {
+  const response = await fetch("/api/sponsor/address");
+  if (!response.ok) {
+    throw new Error("Failed to fetch sponsor address");
+  }
+  const { address } = await response.json();
+  return address;
 }
 
 /**
@@ -89,12 +137,7 @@ export async function executeAgentTransaction(params: {
 /**
  * Execute a transaction where the agent signs the action
  * and the sponsor pays for gas. No zkLogin involved.
- *
- * Flow:
- * 1. Agent is the sender (owns AgentCap)
- * 2. Sponsor is the gas owner (pays gas)
- * 3. Both sign with Ed25519 keypairs
- * 4. Execute with both signatures (sender first)
+ * Server-side only (used in API routes).
  */
 export async function executeSponsoredAgentTransaction(params: {
   transaction: Transaction;
@@ -113,17 +156,14 @@ export async function executeSponsoredAgentTransaction(params: {
   const agentAddress = agentKeypair.getPublicKey().toSuiAddress();
   const sponsorAddress = sponsorKeypair.getPublicKey().toSuiAddress();
 
-  // Agent is the sender, sponsor pays gas
   transaction.setSender(agentAddress);
   transaction.setGasOwner(sponsorAddress);
 
   const txBytes = await transaction.build({ client });
 
-  // Both sign using signTransaction (returns { signature: string })
   const agentSig = await agentKeypair.signTransaction(txBytes);
   const sponsorSig = await sponsorKeypair.signTransaction(txBytes);
 
-  // Execute with both signatures -- sender (agent) first
   const result = await client.executeTransactionBlock({
     transactionBlock: txBytes,
     signature: [agentSig.signature, sponsorSig.signature],

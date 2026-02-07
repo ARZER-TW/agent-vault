@@ -15,19 +15,29 @@ import {
  * Build PTB to create a new Vault with initial deposit and policy.
  */
 export function buildCreateVault(params: {
-  coinObjectId: string;
+  coinObjectId?: string;
+  depositAmount: bigint;
   maxBudget: bigint;
   maxPerTx: bigint;
   allowedActions: number[];
   cooldownMs: bigint;
   expiresAt: bigint;
+  useGasCoin?: boolean;
 }): Transaction {
   const tx = new Transaction();
+
+  // Split the exact deposit amount
+  // useGasCoin: split from gas coin (non-sponsored, avoids coin conflict)
+  // otherwise: split from specific coin object (sponsored mode)
+  const source = params.useGasCoin ? tx.gas : tx.object(params.coinObjectId!);
+  const [depositCoin] = tx.splitCoins(source, [
+    tx.pure.u64(params.depositAmount),
+  ]);
 
   tx.moveCall({
     target: `${PACKAGE_ID}::${MODULE_NAME}::create_vault`,
     arguments: [
-      tx.object(params.coinObjectId),
+      depositCoin,
       tx.pure.u64(params.maxBudget),
       tx.pure.u64(params.maxPerTx),
       tx.pure.vector("u8", params.allowedActions),

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useAuthStore } from "@/lib/store/auth-store";
 import { buildCreateVault } from "@/lib/vault/ptb-builder";
-import { executeSponsoredTransaction } from "@/lib/auth/sponsored-tx";
+import { executeDirectZkLoginTransaction } from "@/lib/auth/sponsored-tx";
 import { suiToMist, mistToSui } from "@/lib/constants";
 import { getSuiCoins, type CoinItem } from "@/lib/sui/coins";
 
@@ -46,6 +46,7 @@ export function CreateVaultForm() {
   const [txDigest, setTxDigest] = useState<string | null>(null);
   const [coins, setCoins] = useState<CoinItem[]>([]);
   const [isLoadingCoins, setIsLoadingCoins] = useState(false);
+  const [coinError, setCoinError] = useState<string | null>(null);
   const [form, setForm] = useState<FormData>({
     depositAmount: "1",
     maxBudget: "0.5",
@@ -70,7 +71,9 @@ export function CreateVaultForm() {
             selectedCoinId: userCoins[0].objectId,
           }));
         }
-      } catch {
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setCoinError(msg);
         setCoins([]);
       } finally {
         setIsLoadingCoins(false);
@@ -79,6 +82,28 @@ export function CreateVaultForm() {
 
     fetchCoins();
   }, [address]);
+
+  async function reloadCoins() {
+    if (!address) return;
+    setIsLoadingCoins(true);
+    setCoinError(null);
+    try {
+      const userCoins = await getSuiCoins(address);
+      setCoins(userCoins);
+      if (userCoins.length > 0) {
+        setForm((prev) => ({
+          ...prev,
+          selectedCoinId: userCoins[0].objectId,
+        }));
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setCoinError(msg);
+      setCoins([]);
+    } finally {
+      setIsLoadingCoins(false);
+    }
+  }
 
   function updateField(field: keyof FormData, value: string | boolean) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -106,14 +131,16 @@ export function CreateVaultForm() {
 
       const tx = buildCreateVault({
         coinObjectId: form.selectedCoinId,
+        depositAmount: suiToMist(Number(form.depositAmount)),
         maxBudget: suiToMist(Number(form.maxBudget)),
         maxPerTx: suiToMist(Number(form.maxPerTx)),
         allowedActions,
         cooldownMs,
         expiresAt,
+        useGasCoin: true, // Use gas coin to avoid coin conflict
       });
 
-      const digest = await executeSponsoredTransaction({
+      const digest = await executeDirectZkLoginTransaction({
         transaction: tx,
         senderAddress: address,
         ephemeralKeypair,
@@ -199,9 +226,9 @@ export function CreateVaultForm() {
         </div>
 
         {/* Coin Selection */}
-        <FormField label="Deposit Coin" hint={
+        <FormField label="Source Coin" hint={
           selectedCoin
-            ? `This entire coin (${mistToSui(selectedCoin.balance).toFixed(4)} SUI) will be deposited.`
+            ? `Available: ${mistToSui(selectedCoin.balance).toFixed(4)} SUI`
             : undefined
         }>
           {isLoadingCoins ? (
@@ -210,8 +237,24 @@ export function CreateVaultForm() {
               <span className="text-gray-500">Loading coins...</span>
             </div>
           ) : coins.length === 0 ? (
-            <div className="vault-input text-red-400 text-sm">
-              No SUI coins found. Please fund your account first.
+            <div className="space-y-2">
+              <div className="vault-input text-red-400 text-sm">
+                {coinError
+                  ? `Error loading coins: ${coinError}`
+                  : "No SUI coins found. Please fund your account first."}
+              </div>
+              {address && (
+                <p className="text-[10px] font-mono text-gray-600 break-all">
+                  Address: {address}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={reloadCoins}
+                className="text-xs text-accent hover:text-accent/80 transition-colors"
+              >
+                Reload coins
+              </button>
             </div>
           ) : (
             <select
@@ -221,11 +264,28 @@ export function CreateVaultForm() {
             >
               {coins.map((coin) => (
                 <option key={coin.objectId} value={coin.objectId}>
-                  {mistToSui(coin.balance).toFixed(4)} SUI ({coin.objectId.slice(0, 8)}...{coin.objectId.slice(-4)})
+                  {mistToSui(coin.balance).toFixed(4)} SUI
                 </option>
               ))}
             </select>
           )}
+        </FormField>
+
+        {/* Deposit Amount */}
+        <FormField label="Deposit Amount (SUI)" hint={
+          selectedCoin
+            ? `Max: ${mistToSui(selectedCoin.balance).toFixed(4)} SUI`
+            : undefined
+        }>
+          <input
+            type="number"
+            step="0.01"
+            min="0.01"
+            max={selectedCoin ? mistToSui(selectedCoin.balance) : undefined}
+            value={form.depositAmount}
+            onChange={(e) => updateField("depositAmount", e.target.value)}
+            className="vault-input"
+          />
         </FormField>
 
         <div className="grid grid-cols-2 gap-4">
