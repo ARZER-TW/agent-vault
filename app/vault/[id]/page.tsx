@@ -6,9 +6,11 @@ import { Header } from "@/components/layout/header";
 import { AgentActivityLog } from "@/components/agent/agent-activity-log";
 import { useAuthStore } from "@/lib/store/auth-store";
 import { useVaultStore } from "@/lib/store/vault-store";
-import { getVault, getAgentCaps } from "@/lib/vault/service";
+import { getVault, getAgentCaps, getOwnerCaps } from "@/lib/vault/service";
+import { buildCreateAgentCap } from "@/lib/vault/ptb-builder";
+import { executeDirectZkLoginTransaction } from "@/lib/auth/sponsored-tx";
 import { mistToSui } from "@/lib/constants";
-import type { VaultData, AgentCapData } from "@/lib/vault/types";
+import type { VaultData, AgentCapData, OwnerCapData } from "@/lib/vault/types";
 
 function StatCard({
   label,
@@ -48,12 +50,15 @@ function PolicyRow({ label, value }: { label: string; value: string }) {
 export default function VaultDetailPage() {
   const params = useParams();
   const vaultId = params.id as string;
-  const { address } = useAuthStore();
+  const { address, ephemeralKeypair, zkProof, maxEpoch } = useAuthStore();
   const { addAgentLog } = useVaultStore();
   const [vault, setVault] = useState<VaultData | null>(null);
   const [agentCaps, setAgentCaps] = useState<AgentCapData[]>([]);
+  const [ownerCap, setOwnerCap] = useState<OwnerCapData | null>(null);
+  const [agentAddress, setAgentAddress] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
+  const [isMinting, setIsMinting] = useState(false);
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [demoAmount, setDemoAmount] = useState("");
 
@@ -63,10 +68,24 @@ export default function VaultDetailPage() {
         const vaultData = await getVault(vaultId);
         setVault(vaultData);
 
-        if (address) {
-          const caps = await getAgentCaps(address);
+        // Fetch agent address from server
+        const agentRes = await fetch("/api/agent/address");
+        const agentJson = await agentRes.json();
+        const fetchedAgentAddress = agentJson.success ? agentJson.address : null;
+        setAgentAddress(fetchedAgentAddress);
+
+        // Query AgentCaps owned by the AGENT address (not the owner)
+        if (fetchedAgentAddress) {
+          const caps = await getAgentCaps(fetchedAgentAddress);
           const vaultCaps = caps.filter((cap) => cap.vaultId === vaultId);
           setAgentCaps(vaultCaps);
+        }
+
+        // Fetch OwnerCaps for the logged-in user (needed for minting AgentCap)
+        if (address) {
+          const ownerCaps = await getOwnerCaps(address);
+          const matchingCap = ownerCaps.find((cap) => cap.vaultId === vaultId);
+          setOwnerCap(matchingCap ?? null);
         }
       } catch (error) {
         const message =
@@ -84,12 +103,54 @@ export default function VaultDetailPage() {
     vault?.authorizedCaps.includes(cap.id),
   );
 
+  const isOwner = address && vault && address === vault.owner;
+
+  async function handleMintAgentCap() {
+    if (!vault || !address || !ownerCap || !agentAddress) return;
+    if (!ephemeralKeypair || !zkProof || maxEpoch === null) return;
+
+    setIsMinting(true);
+    try {
+      const tx = buildCreateAgentCap({
+        vaultId: vault.id,
+        ownerCapId: ownerCap.id,
+        agentAddress,
+      });
+
+      const digest = await executeDirectZkLoginTransaction({
+        transaction: tx,
+        senderAddress: address,
+        ephemeralKeypair,
+        zkProof,
+        maxEpoch,
+      });
+
+      alert(`AgentCap minted! TX: ${digest}`);
+
+      // Refresh vault and agent caps data
+      const [updatedVault] = await Promise.all([
+        getVault(vaultId),
+      ]);
+      setVault(updatedVault);
+
+      const caps = await getAgentCaps(agentAddress);
+      const vaultCaps = caps.filter((cap) => cap.vaultId === vaultId);
+      setAgentCaps(vaultCaps);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to mint AgentCap";
+      alert(message);
+    } finally {
+      setIsMinting(false);
+    }
+  }
+
   async function handleRunAgent() {
-    if (!vault || !address) return;
+    if (!vault || !agentAddress) return;
 
     if (!activeAgentCap) {
       alert(
-        "No authorized AgentCap found. The vault owner must mint an AgentCap for your address first.",
+        "No authorized AgentCap found. Mint an AgentCap for the agent first.",
       );
       return;
     }
@@ -102,7 +163,7 @@ export default function VaultDetailPage() {
         body: JSON.stringify({
           vaultId: vault.id,
           agentCapId: activeAgentCap.id,
-          agentAddress: address,
+          agentAddress,
           ownerAddress: vault.owner,
         }),
       });
@@ -126,7 +187,7 @@ export default function VaultDetailPage() {
   }
 
   async function handleDemoRun(forceAmount: number) {
-    if (!vault || !activeAgentCap) return;
+    if (!vault || !activeAgentCap || !agentAddress) return;
 
     setIsRunning(true);
     try {
@@ -346,6 +407,37 @@ export default function VaultDetailPage() {
                   )}
                 </button>
               </div>
+
+              {/* Mint AgentCap - shown when owner has no authorized cap yet */}
+              {isOwner && !activeAgentCap && agentAddress && ownerCap && (
+                <div className="mb-4 p-4 rounded-xl border border-accent/20 bg-accent/5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-white mb-1">
+                        Authorize AI Agent
+                      </p>
+                      <p className="text-[11px] text-gray-500 font-mono">
+                        Agent: {agentAddress.slice(0, 10)}...{agentAddress.slice(-6)}
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleMintAgentCap}
+                      disabled={isMinting}
+                      className="btn-primary text-sm"
+                    >
+                      {isMinting ? (
+                        <>
+                          <span className="w-3 h-3 border-2 border-void/30 border-t-void rounded-full animate-spin" />
+                          Minting...
+                        </>
+                      ) : (
+                        "Mint AgentCap"
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Demo Mode Panel */}
               <div className="mb-4 p-4 rounded-xl border border-vault-border bg-void/30">
                 <div className="flex items-center justify-between mb-3">
