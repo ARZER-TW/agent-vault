@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import type { ZkLoginSignatureInputs } from "@mysten/sui/zklogin";
+import { clearAuthSession } from "@/lib/auth/zklogin";
 
 interface AuthState {
   address: string | null;
@@ -9,6 +10,12 @@ interface AuthState {
   zkProof: ZkLoginSignatureInputs | null;
   isLoggedIn: boolean;
   login: (params: {
+    address: string;
+    ephemeralKeypair: Ed25519Keypair;
+    maxEpoch: number;
+    zkProof: ZkLoginSignatureInputs;
+  }) => void;
+  restore: (params: {
     address: string;
     ephemeralKeypair: Ed25519Keypair;
     maxEpoch: number;
@@ -31,12 +38,22 @@ export const useAuthStore = create<AuthState>((set) => ({
       zkProof: params.zkProof,
       isLoggedIn: true,
     }),
-  logout: () =>
+  restore: (params) =>
+    set({
+      address: params.address,
+      ephemeralKeypair: params.ephemeralKeypair,
+      maxEpoch: params.maxEpoch,
+      zkProof: params.zkProof,
+      isLoggedIn: true,
+    }),
+  logout: () => {
+    clearAuthSession();
     set({
       address: null,
       ephemeralKeypair: null,
       maxEpoch: null,
       zkProof: null,
       isLoggedIn: false,
-    }),
+    });
+  },
 }));

@@ -23,6 +23,7 @@ const ENOKI_URL = "https://api.enoki.mystenlabs.com/v1/zklogin/zkp";
 const EPHEMERAL_KEY_PAIR_KEY = "zklogin_ephemeral_keypair";
 const RANDOMNESS_KEY = "zklogin_randomness";
 const MAX_EPOCH_KEY = "zklogin_max_epoch";
+const AUTH_SESSION_KEY = "zklogin_auth_session";
 
 export interface ZkLoginSession {
   address: string;
@@ -180,6 +181,67 @@ export function buildZkLoginSignature(params: {
     maxEpoch: params.maxEpoch,
     userSignature: params.userSignature,
   });
+}
+
+/**
+ * Save auth session to sessionStorage for persistence across page refreshes.
+ */
+export function saveAuthSession(params: {
+  address: string;
+  maxEpoch: number;
+  zkProof: ZkLoginSignatureInputs;
+}): void {
+  if (typeof window === "undefined") return;
+  sessionStorage.setItem(
+    AUTH_SESSION_KEY,
+    JSON.stringify({
+      address: params.address,
+      maxEpoch: params.maxEpoch,
+      zkProof: params.zkProof,
+    }),
+  );
+}
+
+/**
+ * Restore auth session from sessionStorage.
+ * Returns null if no session or if data is invalid.
+ */
+export function restoreAuthSession(): {
+  address: string;
+  ephemeralKeypair: Ed25519Keypair;
+  maxEpoch: number;
+  zkProof: ZkLoginSignatureInputs;
+} | null {
+  if (typeof window === "undefined") return null;
+
+  const secretKeyStr = sessionStorage.getItem(EPHEMERAL_KEY_PAIR_KEY);
+  const sessionStr = sessionStorage.getItem(AUTH_SESSION_KEY);
+
+  if (!secretKeyStr || !sessionStr) return null;
+
+  try {
+    const session = JSON.parse(sessionStr);
+    const ephemeralKeypair = Ed25519Keypair.fromSecretKey(secretKeyStr);
+    return {
+      address: session.address,
+      ephemeralKeypair,
+      maxEpoch: session.maxEpoch,
+      zkProof: session.zkProof,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Clear all zkLogin session data from sessionStorage.
+ */
+export function clearAuthSession(): void {
+  if (typeof window === "undefined") return;
+  sessionStorage.removeItem(AUTH_SESSION_KEY);
+  sessionStorage.removeItem(EPHEMERAL_KEY_PAIR_KEY);
+  sessionStorage.removeItem(RANDOMNESS_KEY);
+  sessionStorage.removeItem(MAX_EPOCH_KEY);
 }
 
 /**

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/lib/store/auth-store";
-import { completeZkLogin } from "@/lib/auth/zklogin";
+import { completeZkLogin, saveAuthSession } from "@/lib/auth/zklogin";
 
 const statusConfig: Record<string, { color: string; pulse: boolean }> = {
   processing: { color: "text-accent", pulse: true },
@@ -45,6 +45,12 @@ export default function AuthCallbackPage() {
         login({
           address: session.address,
           ephemeralKeypair: session.ephemeralKeypair,
+          maxEpoch: session.maxEpoch,
+          zkProof: session.zkProof,
+        });
+
+        saveAuthSession({
+          address: session.address,
           maxEpoch: session.maxEpoch,
           zkProof: session.zkProof,
         });
