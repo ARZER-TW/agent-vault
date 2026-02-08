@@ -10,8 +10,7 @@ export const CLOCK_OBJECT_ID = "0x6";
 
 // Network
 export const SUI_NETWORK =
-  (process.env.NEXT_PUBLIC_SUI_NETWORK as "testnet" | "devnet" | "mainnet") ??
-  "testnet";
+  ((process.env.NEXT_PUBLIC_SUI_NETWORK ?? "testnet").trim() as "testnet" | "devnet" | "mainnet");
 
 // DeepBook V3
 export const DEEPBOOK_POOL_KEY = "SUI_DBUSDC";
