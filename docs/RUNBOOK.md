@@ -2,7 +2,7 @@
 
 > 部署程序、常見問題修復、維運指南
 
-**Last Updated:** 2026-02-07
+**Last Updated:** 2026-02-09
 
 ---
 
@@ -46,6 +46,8 @@ sui client publish --gas-budget 100000000
 
 ### Frontend Deployment (Vercel)
 
+**Live URL:** [https://agent-vault-dusky.vercel.app](https://agent-vault-dusky.vercel.app)
+
 ```bash
 # 1. Install Vercel CLI
 npm install -g vercel
@@ -72,7 +74,7 @@ vercel
 
 ```bash
 # Local build verification
-npm build
+npm run build
 
 # Verify no TypeScript errors
 # Verify all pages generate correctly
@@ -323,8 +325,8 @@ sui client call \
 
 ### Before Demo
 
-- [ ] All tests pass (`npm vitest run` + `cd contracts && sui move test`)
-- [ ] Frontend build succeeds (`npm build`)
+- [ ] All tests pass (`npm test` + `cd contracts && sui move test`)
+- [ ] Frontend build succeeds (`npm run build`)
 - [ ] Pre-login with zkLogin (avoid waiting for ZK prover on stage)
 - [ ] Verify Testnet pool has liquidity (`npx tsx scripts/test-deepbook.ts`)
 - [ ] Sponsor wallet balance sufficient (> 5 SUI)

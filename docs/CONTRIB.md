@@ -2,7 +2,7 @@
 
 > 開發工作流程、測試程序、環境設定指南
 
-**Last Updated:** 2026-02-07
+**Last Updated:** 2026-02-09
 
 ---
 
@@ -91,22 +91,22 @@ sui client faucet --address <YOUR_ADDRESS>
 
 ## Available Scripts
 
-### npm/npm Scripts (package.json)
+### npm Scripts (package.json)
 
 | Command             | Description                                   |
 |---------------------|-----------------------------------------------|
-| `npm dev`          | Start Next.js dev server (http://localhost:3000) |
-| `npm build`        | Production build                              |
-| `npm start`        | Start production server                       |
-| `npm lint`         | ESLint check                                  |
+| `npm run dev`      | Start Next.js dev server (http://localhost:3000) |
+| `npm run build`    | Production build                              |
+| `npm run start`    | Start production server                       |
+| `npm run lint`     | ESLint check                                  |
 
 ### Test Commands
 
 | Command                                                 | Description                      |
 |---------------------------------------------------------|----------------------------------|
-| `npm vitest run`                                       | Run all TypeScript unit tests    |
-| `npm vitest`                                           | Watch mode unit tests            |
-| `npm vitest run lib/agent/__tests__/policy-checker.test.ts` | Run specific test file     |
+| `npm test`                                              | Run all TypeScript unit tests (67 tests) |
+| `npm run test:watch`                                    | Watch mode unit tests            |
+| `npx vitest run lib/agent/__tests__/policy-checker.test.ts` | Run specific test file     |
 | `cd contracts && sui move test`                         | Run Move contract tests (15 tests) |
 
 ### Move Contract Commands
@@ -159,10 +159,10 @@ Do NOT accumulate large changes before committing.
 
 ### Local Development Cycle
 
-1. Start dev server: `npm dev`
+1. Start dev server: `npm run dev`
 2. Make code changes
 3. Verify in browser at `http://localhost:3000`
-4. Run tests: `npm vitest run`
+4. Run tests: `npm test`
 5. Commit and push
 
 ---
@@ -222,12 +222,15 @@ app/ (pages + API routes)
 
 ### TypeScript Tests (Vitest)
 
-Current test coverage:
+Current test coverage (67 tests across 5 files):
 
 | Test File                   | Tests | Coverage Area                                    |
 |-----------------------------|-------|--------------------------------------------------|
-| `intent-parser.test.ts`     | 9     | JSON parsing, Zod validation, code block handling |
-| `policy-checker.test.ts`    | 11    | All 6 policy rules boundary conditions           |
+| `intent-parser.test.ts`     | 17    | JSON parsing, Zod validation, code block handling, Unicode, edge cases |
+| `policy-checker.test.ts`    | 10    | All 6 policy rules boundary conditions           |
+| `constants.test.ts`         | 11    | suiToMist and mistToSui unit conversion          |
+| `ptb-builder.test.ts`       | 15    | All PTB builders (create vault, deposit, withdraw, agent ops, swap) |
+| `service.test.ts`           | 14    | On-chain vault queries, owner/agent caps, pagination |
 
 Test cases (intent-parser):
 
@@ -236,10 +239,16 @@ Test cases (intent-parser):
 - Parse JSON inside markdown code block
 - Parse JSON inside plain code block
 - Reject invalid action type
-- Reject out-of-range confidence
+- Reject out-of-range confidence / negative confidence
 - Reject empty reasoning
 - Reject non-numeric amount string
 - Reject non-JSON input
+- Validate schema directly
+- Handle large JSON string (> 10KB)
+- Handle Unicode / CJK characters in reasoning
+- Take first code block when multiple exist
+- Handle JSON with escaped quotes
+- Accept boundary confidence values (0 and 1)
 
 Test cases (policy-checker):
 
@@ -253,6 +262,26 @@ Test cases (policy-checker):
 - Reject amount exceeding remaining budget
 - Reject non-whitelisted action type
 - Reject insufficient balance
+
+Test cases (constants):
+
+- suiToMist: 1 SUI, 0 SUI, fractional, large values, sub-MIST precision, negative
+- mistToSui: 1e9 MIST, 0 MIST, fractional, very large BigInt, smallest unit
+
+Test cases (ptb-builder):
+
+- buildCreateVault: gas coin, coinObjectId, empty allowedActions, zero deposit
+- buildDepositFromGas: valid params, zero amount, large amount
+- buildWithdrawAll, buildCreateAgentCap, buildRevokeAgentCap: valid params
+- buildAgentWithdraw: valid params, different action types
+- buildAgentSwap: valid swap, DeepBookClient call, custom poolKey
+
+Test cases (service):
+
+- getVault: flat/nested field format, vault not found, missing content, non-moveObject
+- getOwnerCaps: empty, string vault_id, nested vault_id, pagination
+- getAgentCaps: empty, parse correctly
+- getOwnedVaults: empty, via owner caps, skip missing content
 
 ### Move Contract Tests (15/15 passing)
 

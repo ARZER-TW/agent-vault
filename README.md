@@ -80,6 +80,8 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+**Live Demo:** [https://agent-vault-dusky.vercel.app](https://agent-vault-dusky.vercel.app)
+
 ### 4. Try Demo Mode (No LLM API Key Needed)
 
 1. Sign in with Google (zkLogin)
@@ -351,6 +353,7 @@ suistody/
 |   +-- page.tsx                     # Landing page (Vault Noir hero)
 |   +-- layout.tsx                   # Root layout with Providers
 |   +-- globals.css                  # Vault Noir design system
+|   +-- fonts/                       # Geist font files
 |   +-- auth/callback/page.tsx       # zkLogin OAuth callback handler
 |   +-- vault/
 |   |   +-- page.tsx                 # Vault dashboard (list all vaults)
@@ -368,17 +371,23 @@ suistody/
 |           +-- sign-and-execute/route.ts # POST: co-sign sponsored TX
 +-- lib/
 |   +-- constants.ts                 # Package ID, network, action types
-|   +-- sui/                         # Sui SDK
+|   +-- rate-limiter.ts              # API rate limiting utility
+|   +-- sui/                         # Sui SDK (client, deepbook, market, coins)
 |   +-- agent/                       # AI Agent runtime + policy
 |   +-- vault/                       # Vault types, PTB builders, service
 |   +-- auth/                        # zkLogin + sponsored TX
-|   +-- store/                       # Zustand state
+|   +-- store/                       # Zustand state (auth-store, vault-store)
+|   +-- __tests__/                   # Unit tests for constants
 +-- components/                      # React components
+|   +-- providers.tsx                # React Query + context providers
 |   +-- layout/header.tsx
 |   +-- auth/login-button.tsx
-|   +-- vault/                       # Vault UI components
-|   +-- agent/                       # Agent activity log
+|   +-- vault/                       # Vault UI (create form, cards, policy, demo, stress test, audit)
+|   +-- agent/                       # Agent activity log + log entries
+|   +-- wallet/                      # Wallet transfer component
 |   +-- ui/                          # Shared UI (toast, ring-chart)
++-- scripts/
+|   +-- test-deepbook.ts             # DeepBook V3 connectivity diagnostics
 +-- vitest.config.ts
 +-- tailwind.config.ts
 +-- tsconfig.json
@@ -392,7 +401,7 @@ suistody/
 ### Run Tests
 
 ```bash
-# TypeScript unit tests (20 tests)
+# TypeScript unit tests (67 tests across 5 files)
 npm test
 
 # Move contract tests (15 tests)
@@ -418,7 +427,7 @@ cd contracts && sui move test
 | On-Chain Audit Trail    | Complete           | Event-based transaction history                  |
 | Demo Mode               | Complete           | Forced-amount policy testing (skip LLM)          |
 | Frontend                | Complete           | Vault Noir design, all pages                     |
-| Unit Tests              | 20/20 passing      | Vitest (intent-parser + policy-checker)          |
+| Unit Tests              | 67/67 passing      | Vitest (5 test files: intent-parser, policy-checker, constants, ptb-builder, service) |
 | Contract Tests          | 15/15 passing      | sui move test                                    |
 
 ---
