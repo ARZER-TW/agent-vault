@@ -31,6 +31,64 @@ Your AI agent receives an **AgentCap** (transferable NFT permission token) that 
 
 ---
 
+## Quick Start (5 Minutes)
+
+### Prerequisites
+
+- Node.js >= 18
+- Git
+
+### 1. Clone & Install
+
+```bash
+git clone https://github.com/ARZER-TW/agent-vault.git
+cd agent-vault
+npm install
+```
+
+### 2. Configure Environment
+
+```bash
+cp .env.example .env.local
+```
+
+**Required** environment variables:
+
+| Variable | Purpose |
+|----------|---------|
+| `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | Google OAuth Client ID for zkLogin |
+| `NEXT_PUBLIC_ENOKI_API_KEY` | Enoki API key for ZK proof generation |
+| `SPONSOR_PRIVATE_KEY` | Sui keypair (bech32 `suiprivkey1...`) that pays gas |
+| `AGENT_PRIVATE_KEY` | Sui keypair for the AI agent wallet |
+
+**Optional** (set at least one for AI mode; Demo Mode works without any):
+
+| Variable | Purpose |
+|----------|---------|
+| `OPENAI_API_KEY` | Use GPT-4o as the trading LLM |
+| `GEMINI_API_KEY` | Use Gemini 2.0 Flash as the trading LLM |
+| `ANTHROPIC_API_KEY` | Use Claude Sonnet as the trading LLM |
+| `LLM_PROVIDER` | Force a specific provider (`openai` / `gemini` / `anthropic`) |
+
+> **Tip:** The contract is already deployed to Sui Testnet. `NEXT_PUBLIC_PACKAGE_ID` is pre-configured in `.env.example`.
+
+### 3. Run
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+### 4. Try Demo Mode (No LLM API Key Needed)
+
+1. Sign in with Google (zkLogin)
+2. Create a Vault with a test policy
+3. On the Vault detail page, use **Demo Mode** to test policy enforcement directly
+4. Run the **Guardrail Stress Test** to verify all 5 adversarial scenarios are blocked
+
+---
+
 ## Key Features
 
 ### Multi-LLM Agent Runtime
@@ -85,21 +143,186 @@ All 5 tests should show BLOCKED for a correctly configured vault.
 
 ## Architecture
 
+### System Overview
+
+```mermaid
+flowchart TD
+    subgraph Frontend["Frontend (Next.js 14 + React 18)"]
+        UI["Vault Dashboard\nAgent Monitor\nStrategy Input"]
+        ZkAuth["zkLogin Auth"]
+    end
+
+    subgraph Backend["Backend (Next.js API Routes)"]
+        API["POST /api/agent/run\nPOST /api/agent/demo-run\nPOST /api/agent/policy-test"]
+        Runtime["Agent Runtime\n7-Step Pipeline"]
+        LLM["Multi-LLM Client\nOpenAI | Gemini | Anthropic"]
+        Parser["Intent Parser\nZod Validation"]
+        Policy["Policy Checker\n6 Off-Chain Rules"]
+        PTB["PTB Builder\n9 Transaction Builders"]
+        Sponsor["Sponsored TX\nDual Signature"]
+    end
+
+    subgraph Blockchain["Sui Blockchain (Testnet)"]
+        Contract["agent_vault.move\nVault + Policy + AgentCap"]
+        DeepBook["DeepBook V3\nCLOB Order Book"]
+        ZkLogin["zkLogin\nValidator-Level ZK Proof"]
+    end
+
+    subgraph Auth["Authentication"]
+        Google["Google OAuth 2.0"]
+        Enoki["Enoki ZK Prover"]
+    end
+
+    UI -->|"HTTP POST"| API
+    API --> Runtime
+    Runtime -->|"1. Market Data"| DeepBook
+    Runtime -->|"2. Query LLM"| LLM
+    LLM -->|"JSON Response"| Parser
+    Runtime -->|"4. Pre-check"| Policy
+    Runtime -->|"5. Build PTB"| PTB
+    PTB -->|"6. Execute"| Sponsor
+    Sponsor -->|"agent_withdraw + swap"| Contract
+    Sponsor -->|"swap via CLOB"| DeepBook
+
+    ZkAuth -->|"OAuth"| Google
+    Google -->|"JWT"| Enoki
+    Enoki -->|"ZK Proof"| ZkLogin
+
+    style Frontend fill:#0a0e1a,stroke:#00d4ff,color:#fff
+    style Backend fill:#0a0e1a,stroke:#f59e0b,color:#fff
+    style Blockchain fill:#0a0e1a,stroke:#22c55e,color:#fff
+    style Auth fill:#0a0e1a,stroke:#a855f7,color:#fff
 ```
-+-----------------------------------------------------------+
-|  Frontend (Next.js 14 + React 18)                         |
-|  zkLogin Auth | Vault Management | Agent Monitor          |
-+-----------------------------------------------------------+
-           |
-+-----------------------------------------------------------+
-|  Backend (Next.js API Routes + Agent Runtime)             |
-|  Multi-LLM | PTB Builder | Sponsored TX                  |
-+-----------------------------------------------------------+
-           |
-+-----------------------------------------------------------+
-|  Sui Blockchain (Testnet)                                 |
-|  agent_vault.move | DeepBook V3 (CLOB) | zkLogin (Auth)  |
-+-----------------------------------------------------------+
+
+### Agent Decision Loop (7-Step Pipeline)
+
+Based on the actual implementation in `lib/agent/runtime.ts`:
+
+```mermaid
+sequenceDiagram
+    participant UI as Frontend
+    participant API as API Route
+    participant RT as Agent Runtime
+    participant DB as DeepBook V3
+    participant LLM as LLM Provider
+    participant ZOD as Intent Parser
+    participant PC as Policy Checker
+    participant PTB as PTB Builder
+    participant TX as Sponsored TX
+    participant SUI as Sui Blockchain
+
+    UI->>API: POST /api/agent/run
+    API->>RT: runAgentCycle()
+
+    Note over RT: Step 1 - Fetch Vault State
+    RT->>SUI: getVault(vaultId)
+    SUI-->>RT: VaultData (balance, policy, spent)
+
+    Note over RT: Step 2 - Get Market Data
+    RT->>DB: getOrderBook(poolKey)
+    DB-->>RT: OrderBookSnapshot (bids, asks, midPrice)
+
+    Note over RT: Step 3 - Query LLM
+    RT->>LLM: getAgentDecision(vault, orderBook, strategy)
+    LLM-->>RT: Raw JSON response
+
+    Note over RT: Step 4 - Parse & Validate Intent
+    RT->>ZOD: parseAgentDecision(rawText)
+    ZOD-->>RT: AgentDecision (action, amount, reasoning)
+
+    alt action == "hold"
+        RT-->>API: Return hold (no TX)
+    end
+
+    Note over RT: Step 5 - Off-Chain Policy Check
+    RT->>PC: checkPolicy(vault, amount, actionType)
+    PC-->>RT: PolicyCheckResult
+
+    alt Policy Rejected
+        RT-->>API: Return blocked + reason
+    end
+
+    Note over RT: Step 6 - Build PTB
+    RT->>PTB: buildAgentSwap(vault, cap, amount)
+    Note over PTB: agent_withdraw -> DeepBook swap -> transferObjects
+
+    Note over RT: Step 7 - Execute On-Chain
+    RT->>TX: executeSponsoredAgentTransaction(tx, agentKeypair)
+    TX->>SUI: Dual-signed TX (agent + sponsor)
+    SUI-->>TX: TX digest
+    TX-->>RT: Confirmed result
+
+    RT-->>API: AgentRunResult
+    API-->>UI: JSON response + TX hash
+```
+
+### Security Model: Dual-Layer Policy Enforcement
+
+Policy is enforced **twice** -- off-chain (to save gas) and on-chain (to guarantee correctness):
+
+```mermaid
+flowchart LR
+    subgraph OffChain["Off-Chain Pre-Check (policy-checker.ts)"]
+        direction TB
+        R0["Zero Amount?"]
+        R1["Expired?"]
+        R2["Cooldown Active?"]
+        R3["Exceeds Per-TX Limit?"]
+        R4["Exceeds Total Budget?"]
+        R5["Action Whitelisted?"]
+        R6["Sufficient Balance?"]
+
+        R0 -->|"pass"| R1
+        R1 -->|"pass"| R2
+        R2 -->|"pass"| R3
+        R3 -->|"pass"| R4
+        R4 -->|"pass"| R5
+        R5 -->|"pass"| R6
+    end
+
+    subgraph OnChain["On-Chain Enforcement (agent_vault.move)"]
+        direction TB
+        M0["assert amount > 0"]
+        M1["assert cap.vault_id == vault"]
+        M2["assert cap in authorized_caps"]
+        M3["assert now < expires_at"]
+        M4["assert cooldown elapsed"]
+        M5["assert amount <= max_per_tx"]
+        M6["assert amount <= budget - spent"]
+        M7["assert action in allowed_actions"]
+        M8["assert balance >= amount"]
+
+        M0 --> M1 --> M2 --> M3 --> M4 --> M5 --> M6 --> M7 --> M8
+    end
+
+    Agent["Agent Request\n(amount, action)"] --> R0
+    R6 -->|"Approved"| Build["Build PTB"]
+    Build --> M0
+    M8 -->|"All Passed"| Execute["Execute + Update State"]
+
+    R0 -->|"fail"| Reject1["REJECTED\n(gas saved)"]
+    R1 -->|"fail"| Reject1
+    R2 -->|"fail"| Reject1
+    R3 -->|"fail"| Reject1
+    R4 -->|"fail"| Reject1
+    R5 -->|"fail"| Reject1
+    R6 -->|"fail"| Reject1
+
+    M0 -->|"abort"| Reject2["ABORTED\n(on-chain)"]
+    M1 -->|"abort"| Reject2
+    M2 -->|"abort"| Reject2
+    M3 -->|"abort"| Reject2
+    M4 -->|"abort"| Reject2
+    M5 -->|"abort"| Reject2
+    M6 -->|"abort"| Reject2
+    M7 -->|"abort"| Reject2
+    M8 -->|"abort"| Reject2
+
+    style OffChain fill:#1a1a2e,stroke:#f59e0b,color:#fff
+    style OnChain fill:#1a1a2e,stroke:#22c55e,color:#fff
+    style Reject1 fill:#dc2626,stroke:#dc2626,color:#fff
+    style Reject2 fill:#dc2626,stroke:#dc2626,color:#fff
+    style Execute fill:#22c55e,stroke:#22c55e,color:#fff
 ```
 
 ### Data Flow
@@ -292,29 +515,9 @@ agent-vault/
 
 ---
 
-## Quick Start
+## Development
 
-### Prerequisites
-
-- Node.js >= 18
-- pnpm (recommended) or npm
-- Sui CLI (for contract deployment only)
-- Google Cloud OAuth Client ID (for zkLogin)
-- One LLM API key (OpenAI, Gemini, or Anthropic)
-
-### 1. Install Dependencies
-
-```bash
-pnpm install
-```
-
-### 2. Configure Environment
-
-```bash
-cp .env.example .env.local
-```
-
-Fill in the required values:
+### Environment Variables (Full Reference)
 
 ```bash
 # Sui Network
@@ -346,25 +549,17 @@ SPONSOR_PRIVATE_KEY=suiprivkey1xxx
 AGENT_PRIVATE_KEY=suiprivkey1xxx
 ```
 
-### 3. Run Development Server
-
-```bash
-pnpm dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) to see the app.
-
-### 4. Run Tests
+### Run Tests
 
 ```bash
 # TypeScript unit tests (20 tests)
-pnpm vitest run
+npm test
 
 # Move contract tests (15 tests)
 cd contracts && sui move test
 ```
 
-### 5. Diagnose DeepBook
+### Diagnose DeepBook
 
 ```bash
 npx tsx scripts/test-deepbook.ts
