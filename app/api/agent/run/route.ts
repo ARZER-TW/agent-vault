@@ -48,6 +48,7 @@ export async function POST(request: NextRequest) {
         market: {
           midPrice: result.orderBook.midPrice,
           timestamp: result.orderBook.timestamp,
+          source: result.orderBook.source,
         },
       },
     });
