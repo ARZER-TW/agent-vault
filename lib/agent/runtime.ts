@@ -231,6 +231,10 @@ export async function runAgentCycle(params: {
     });
   } catch (sponsoredError) {
     // Fallback: agent pays own gas
+    // Reset sender/gasOwner since sponsored path may have mutated the TX
+    const agentAddr = agentKeypair.getPublicKey().toSuiAddress();
+    transaction.setSender(agentAddr);
+    transaction.setGasOwner(agentAddr);
     try {
       txDigest = await executeAgentTransaction({
         transaction,
