@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { runAgentCycle } from "@/lib/agent/runtime";
 import { mistToSui } from "@/lib/constants";
+import { checkRateLimit, getClientKey } from "@/lib/rate-limiter";
 
 const RequestSchema = z.object({
   vaultId: z.string().min(1),
@@ -12,6 +13,15 @@ const RequestSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const rl = checkRateLimit(getClientKey(request.headers), { limit: 10, windowMs: 60_000 });
+  if (!rl.allowed) {
+    const secs = Math.ceil((rl.retryAfterMs ?? 0) / 1000);
+    return NextResponse.json(
+      { success: false, error: `Rate limit exceeded. Try again in ${secs} seconds.` },
+      { status: 429 },
+    );
+  }
+
   try {
     const body = await request.json();
     const params = RequestSchema.parse(body);

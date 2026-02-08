@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getVault } from "@/lib/vault/service";
 import { checkPolicy } from "@/lib/agent/policy-checker";
 import { suiToMist, mistToSui, ACTION_SWAP } from "@/lib/constants";
+import { checkRateLimit, getClientKey } from "@/lib/rate-limiter";
 
 const PolicyTestSchema = z.object({
   vaultId: z.string().min(1),
@@ -30,6 +31,15 @@ interface TestResult {
  * Intentionally constructs violating requests to verify guardrails.
  */
 export async function POST(request: NextRequest) {
+  const rl = checkRateLimit(getClientKey(request.headers), { limit: 30, windowMs: 60_000 });
+  if (!rl.allowed) {
+    const secs = Math.ceil((rl.retryAfterMs ?? 0) / 1000);
+    return NextResponse.json(
+      { success: false, error: `Rate limit exceeded. Try again in ${secs} seconds.` },
+      { status: 429 },
+    );
+  }
+
   try {
     const body = await request.json();
     const params = PolicyTestSchema.parse(body);

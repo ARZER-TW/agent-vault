@@ -10,6 +10,7 @@ import {
 } from "@/lib/auth/sponsored-tx";
 import { getSuiClient } from "@/lib/sui/client";
 import { suiToMist, mistToSui, ACTION_SWAP } from "@/lib/constants";
+import { checkRateLimit, getClientKey } from "@/lib/rate-limiter";
 
 const DemoRequestSchema = z.object({
   vaultId: z.string().min(1),
@@ -24,6 +25,15 @@ const DemoRequestSchema = z.object({
  * Executes agent_withdraw to demonstrate policy enforcement on-chain.
  */
 export async function POST(request: NextRequest) {
+  const rl = checkRateLimit(getClientKey(request.headers), { limit: 20, windowMs: 60_000 });
+  if (!rl.allowed) {
+    const secs = Math.ceil((rl.retryAfterMs ?? 0) / 1000);
+    return NextResponse.json(
+      { success: false, error: `Rate limit exceeded. Try again in ${secs} seconds.` },
+      { status: 429 },
+    );
+  }
+
   try {
     const body = await request.json();
     const params = DemoRequestSchema.parse(body);

@@ -1,31 +1,39 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { getSuiClient } from "@/lib/sui/client";
 import { fromBase64 } from "@mysten/sui/utils";
+import { checkRateLimit, getClientKey } from "@/lib/rate-limiter";
+
+const SignAndExecuteSchema = z.object({
+  txBytes: z.string().min(1),
+  userSignature: z.string().min(1),
+});
 
 /**
  * POST /api/sponsor/sign-and-execute
  *
  * Receives pre-built transaction bytes (base64, from Transaction.sign())
  * and the user's zkLogin signature. Co-signs with sponsor key and executes.
- *
- * Body: { txBytes: string (base64), userSignature: string (zkLogin sig) }
  */
 export async function POST(req: NextRequest) {
-  try {
-    const { txBytes, userSignature } = await req.json();
+  const rl = checkRateLimit(getClientKey(req.headers), { limit: 10, windowMs: 60_000 });
+  if (!rl.allowed) {
+    const secs = Math.ceil((rl.retryAfterMs ?? 0) / 1000);
+    return NextResponse.json(
+      { success: false, error: `Rate limit exceeded. Try again in ${secs} seconds.` },
+      { status: 429 },
+    );
+  }
 
-    if (!txBytes || !userSignature) {
-      return NextResponse.json(
-        { error: "Missing txBytes or userSignature" },
-        { status: 400 },
-      );
-    }
+  try {
+    const body = await req.json();
+    const { txBytes, userSignature } = SignAndExecuteSchema.parse(body);
 
     const sponsorKeyStr = process.env.SPONSOR_PRIVATE_KEY;
     if (!sponsorKeyStr) {
       return NextResponse.json(
-        { error: "Sponsor wallet not configured" },
+        { success: false, error: "Sponsor wallet not configured" },
         { status: 500 },
       );
     }
@@ -33,13 +41,9 @@ export async function POST(req: NextRequest) {
     const sponsorKeypair = Ed25519Keypair.fromSecretKey(sponsorKeyStr);
     const client = getSuiClient();
 
-    // Decode transaction bytes from base64
     const txBytesArray = fromBase64(txBytes);
-
-    // Sponsor signs the transaction (same bytes the user signed)
     const sponsorSig = await sponsorKeypair.signTransaction(txBytesArray);
 
-    // Execute with both signatures: user (zkLogin) first, then sponsor
     const result = await client.executeTransactionBlock({
       transactionBlock: txBytesArray,
       signature: [userSignature, sponsorSig.signature],
@@ -49,14 +53,26 @@ export async function POST(req: NextRequest) {
     if (result.effects?.status?.status !== "success") {
       const errorMsg =
         result.effects?.status?.error ?? "Transaction execution failed";
-      return NextResponse.json({ error: errorMsg }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: errorMsg },
+        { status: 400 },
+      );
     }
 
-    return NextResponse.json({ digest: result.digest });
+    return NextResponse.json({ success: true, digest: result.digest });
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { success: false, error: "Invalid request parameters", details: error.errors },
+        { status: 400 },
+      );
+    }
+
     const message =
       error instanceof Error ? error.message : "Internal server error";
-    console.error("[sponsor/sign-and-execute] Error:", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: message },
+      { status: 500 },
+    );
   }
 }

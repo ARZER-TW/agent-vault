@@ -1,11 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getVault } from "@/lib/vault/service";
 import { mistToSui } from "@/lib/constants";
+import { checkRateLimit, getClientKey } from "@/lib/rate-limiter";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } },
 ) {
+  const rl = checkRateLimit(getClientKey(request.headers), { limit: 60, windowMs: 60_000 });
+  if (!rl.allowed) {
+    const secs = Math.ceil((rl.retryAfterMs ?? 0) / 1000);
+    return NextResponse.json(
+      { success: false, error: `Rate limit exceeded. Try again in ${secs} seconds.` },
+      { status: 429 },
+    );
+  }
+
   try {
     const vault = await getVault(params.id);
 
