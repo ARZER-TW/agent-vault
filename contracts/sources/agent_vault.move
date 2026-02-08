@@ -3,6 +3,7 @@ module agent_vault::agent_vault {
     use sui::coin::{Self, Coin};
     use sui::clock::Clock;
     use sui::sui::SUI;
+    use sui::event;
 
     // === Error Constants ===
     const E_NOT_OWNER: u64 = 0;
@@ -50,6 +51,56 @@ module agent_vault::agent_vault {
         vault_id: ID,
     }
 
+    // === Events ===
+
+    public struct VaultCreated has copy, drop {
+        vault_id: ID,
+        owner: address,
+        initial_balance: u64,
+        max_budget: u64,
+    }
+
+    public struct AgentWithdrawal has copy, drop {
+        vault_id: ID,
+        agent_cap_id: ID,
+        amount: u64,
+        action_type: u8,
+        total_spent: u64,
+        remaining_budget: u64,
+        tx_count: u64,
+        timestamp: u64,
+    }
+
+    public struct PolicyUpdated has copy, drop {
+        vault_id: ID,
+        max_budget: u64,
+        max_per_tx: u64,
+        cooldown_ms: u64,
+        expires_at: u64,
+    }
+
+    public struct AgentCapCreated has copy, drop {
+        vault_id: ID,
+        cap_id: ID,
+        agent_address: address,
+    }
+
+    public struct AgentCapRevoked has copy, drop {
+        vault_id: ID,
+        cap_id: ID,
+    }
+
+    public struct Deposited has copy, drop {
+        vault_id: ID,
+        amount: u64,
+        new_balance: u64,
+    }
+
+    public struct WithdrawnAll has copy, drop {
+        vault_id: ID,
+        amount: u64,
+    }
+
     // === Public Entry Functions ===
 
     /// Create a new Vault with initial deposit and policy
@@ -66,6 +117,7 @@ module agent_vault::agent_vault {
     ) {
         let vault_uid = object::new(ctx);
         let vault_id = vault_uid.to_inner();
+        let initial_balance = coin.value();
 
         let vault = Vault {
             id: vault_uid,
@@ -89,6 +141,13 @@ module agent_vault::agent_vault {
             vault_id,
         };
 
+        event::emit(VaultCreated {
+            vault_id,
+            owner: ctx.sender(),
+            initial_balance,
+            max_budget,
+        });
+
         transfer::share_object(vault);
         transfer::transfer(owner_cap, ctx.sender());
     }
@@ -100,7 +159,14 @@ module agent_vault::agent_vault {
         coin: Coin<SUI>,
     ) {
         assert!(owner_cap.vault_id == object::id(vault), E_NOT_OWNER);
+        let amount = coin.value();
         vault.balance_sui.join(coin.into_balance());
+
+        event::emit(Deposited {
+            vault_id: object::id(vault),
+            amount,
+            new_balance: vault.balance_sui.value(),
+        });
     }
 
     /// Owner withdraws all funds from Vault
@@ -111,7 +177,37 @@ module agent_vault::agent_vault {
     ): Coin<SUI> {
         assert!(owner_cap.vault_id == object::id(vault), E_NOT_OWNER);
         let amount = vault.balance_sui.value();
+
+        event::emit(WithdrawnAll {
+            vault_id: object::id(vault),
+            amount,
+        });
+
         coin::from_balance(vault.balance_sui.split(amount), ctx)
+    }
+
+    /// Owner withdraws a specific amount from Vault
+    public fun withdraw(
+        vault: &mut Vault,
+        owner_cap: &OwnerCap,
+        amount: u64,
+        ctx: &mut TxContext,
+    ): Coin<SUI> {
+        assert!(owner_cap.vault_id == object::id(vault), E_NOT_OWNER);
+        assert!(amount > 0, E_ZERO_AMOUNT);
+        assert!(vault.balance_sui.value() >= amount, E_INSUFFICIENT_BALANCE);
+        coin::from_balance(vault.balance_sui.split(amount), ctx)
+    }
+
+    /// Owner resets spending counters
+    public fun reset_counters(
+        vault: &mut Vault,
+        owner_cap: &OwnerCap,
+    ) {
+        assert!(owner_cap.vault_id == object::id(vault), E_NOT_OWNER);
+        vault.total_spent = 0;
+        vault.tx_count = 0;
+        vault.last_tx_time = 0;
     }
 
     /// Owner updates policy rules
@@ -132,6 +228,14 @@ module agent_vault::agent_vault {
             cooldown_ms,
             expires_at,
         };
+
+        event::emit(PolicyUpdated {
+            vault_id: object::id(vault),
+            max_budget,
+            max_per_tx,
+            cooldown_ms,
+            expires_at,
+        });
     }
 
     /// Owner creates an AgentCap for an agent address
@@ -152,6 +256,13 @@ module agent_vault::agent_vault {
         };
 
         vault.authorized_caps.push_back(cap_id);
+
+        event::emit(AgentCapCreated {
+            vault_id: object::id(vault),
+            cap_id,
+            agent_address,
+        });
+
         transfer::transfer(agent_cap, agent_address);
     }
 
@@ -166,6 +277,11 @@ module agent_vault::agent_vault {
         let (found, idx) = vault.authorized_caps.index_of(&cap_id);
         assert!(found, E_INVALID_CAP);
         vault.authorized_caps.remove(idx);
+
+        event::emit(AgentCapRevoked {
+            vault_id: object::id(vault),
+            cap_id,
+        });
     }
 
     /// Agent withdraws funds from Vault (checks all policy rules)
@@ -214,6 +330,17 @@ module agent_vault::agent_vault {
         vault.total_spent = vault.total_spent + amount;
         vault.last_tx_time = now;
         vault.tx_count = vault.tx_count + 1;
+
+        event::emit(AgentWithdrawal {
+            vault_id: object::id(vault),
+            agent_cap_id: object::id(cap),
+            amount,
+            action_type,
+            total_spent: vault.total_spent,
+            remaining_budget: vault.policy.max_budget - vault.total_spent,
+            tx_count: vault.tx_count,
+            timestamp: now,
+        });
 
         // 10. Extract and return funds
         coin::from_balance(vault.balance_sui.split(amount), ctx)
