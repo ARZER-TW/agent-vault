@@ -57,7 +57,7 @@ export function Header() {
           </div>
 
           <span className="font-display font-bold text-lg text-white tracking-tight">
-            AgentVault
+            Suistody
           </span>
 
           <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20">

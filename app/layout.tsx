@@ -3,9 +3,9 @@ import { Providers } from "@/components/providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AgentVault | Policy-Controlled AI Trading on Sui",
+  title: "Suistody | Policy-Controlled AI Trading on Sui",
   description:
-    "Don't give your AI agent the keys. Give it a budget. Policy-enforced vaults for autonomous AI trading via DeepBook V3 on Sui.",
+    "Don't give your AI agent the keys. Give it a budget. Policy-enforced custody for autonomous AI trading via DeepBook V3 on Sui.",
 };
 
 export default function RootLayout({

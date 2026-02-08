@@ -285,7 +285,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="border-t border-vault-border py-8 text-center">
         <p className="text-xs text-gray-600 font-mono">
-          AgentVault -- HackMoney 2026 -- Built on Sui
+          Suistody -- HackMoney 2026 -- Built on Sui
         </p>
       </footer>
     </div>

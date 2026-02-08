@@ -18,15 +18,9 @@ export const DEEPBOOK_POOL_KEY = "SUI_DBUSDC";
 
 // Action types (matching Move contract)
 export const ACTION_SWAP = 0;
-export const ACTION_LIMIT_ORDER = 1;
-export const ACTION_PROVIDE_LIQUIDITY = 2;
-export const ACTION_STAKE = 3;
 
 export const ACTION_LABELS: Record<number, string> = {
   0: "Swap",
-  1: "Limit Order",
-  2: "Provide Liquidity",
-  3: "Stake",
 };
 
 // Unit conversion

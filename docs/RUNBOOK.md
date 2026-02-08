@@ -1,4 +1,4 @@
-# AgentVault -- Runbook
+# Suistody -- Runbook
 
 > 部署程序、常見問題修復、維運指南
 
@@ -72,7 +72,7 @@ vercel
 
 ```bash
 # Local build verification
-pnpm build
+npm build
 
 # Verify no TypeScript errors
 # Verify all pages generate correctly
@@ -323,8 +323,8 @@ sui client call \
 
 ### Before Demo
 
-- [ ] All tests pass (`pnpm vitest run` + `cd contracts && sui move test`)
-- [ ] Frontend build succeeds (`pnpm build`)
+- [ ] All tests pass (`npm vitest run` + `cd contracts && sui move test`)
+- [ ] Frontend build succeeds (`npm build`)
 - [ ] Pre-login with zkLogin (avoid waiting for ZK prover on stage)
 - [ ] Verify Testnet pool has liquidity (`npx tsx scripts/test-deepbook.ts`)
 - [ ] Sponsor wallet balance sufficient (> 5 SUI)
@@ -373,5 +373,4 @@ const ACTION_LIMIT_ORDER = 1;
 
 - [README.md](../README.md) -- Project overview
 - [CONTRIB.md](./CONTRIB.md) -- Development workflow
-- [TECH_SPEC.md](../TECH_SPEC.md) -- Full technical specification
 - [CLAUDE.md](../CLAUDE.md) -- Claude Code working guidelines

@@ -1,4 +1,4 @@
-# AgentVault -- Development Guide
+# Suistody -- Development Guide
 
 > 開發工作流程、測試程序、環境設定指南
 
@@ -11,9 +11,9 @@
 | Tool       | Version  | Purpose                          | Install                                |
 |------------|----------|----------------------------------|----------------------------------------|
 | Node.js    | >= 18    | JavaScript runtime               | https://nodejs.org/                    |
-| pnpm       | >= 8     | Package manager (recommended)    | `npm install -g pnpm`                  |
+| npm        | >= 9     | Package manager                  | Bundled with Node.js                   |
 | Sui CLI    | latest   | Move contract build/deploy/test  | https://docs.sui.io/build/install      |
-| TypeScript | >= 5     | Type checking (included in devDeps) | Installed via pnpm                  |
+| TypeScript | >= 5     | Type checking (included in devDeps) | Installed via npm                  |
 
 ### Optional
 
@@ -32,7 +32,7 @@
 ```bash
 git clone https://github.com/ARZER-TW/agent-vault.git
 cd agent-vault
-pnpm install
+npm install
 ```
 
 ### 2. Environment Variables
@@ -91,22 +91,22 @@ sui client faucet --address <YOUR_ADDRESS>
 
 ## Available Scripts
 
-### npm/pnpm Scripts (package.json)
+### npm/npm Scripts (package.json)
 
 | Command             | Description                                   |
 |---------------------|-----------------------------------------------|
-| `pnpm dev`          | Start Next.js dev server (http://localhost:3000) |
-| `pnpm build`        | Production build                              |
-| `pnpm start`        | Start production server                       |
-| `pnpm lint`         | ESLint check                                  |
+| `npm dev`          | Start Next.js dev server (http://localhost:3000) |
+| `npm build`        | Production build                              |
+| `npm start`        | Start production server                       |
+| `npm lint`         | ESLint check                                  |
 
 ### Test Commands
 
 | Command                                                 | Description                      |
 |---------------------------------------------------------|----------------------------------|
-| `pnpm vitest run`                                       | Run all TypeScript unit tests    |
-| `pnpm vitest`                                           | Watch mode unit tests            |
-| `pnpm vitest run lib/agent/__tests__/policy-checker.test.ts` | Run specific test file     |
+| `npm vitest run`                                       | Run all TypeScript unit tests    |
+| `npm vitest`                                           | Watch mode unit tests            |
+| `npm vitest run lib/agent/__tests__/policy-checker.test.ts` | Run specific test file     |
 | `cd contracts && sui move test`                         | Run Move contract tests (15 tests) |
 
 ### Move Contract Commands
@@ -159,10 +159,10 @@ Do NOT accumulate large changes before committing.
 
 ### Local Development Cycle
 
-1. Start dev server: `pnpm dev`
+1. Start dev server: `npm dev`
 2. Make code changes
 3. Verify in browser at `http://localhost:3000`
-4. Run tests: `pnpm vitest run`
+4. Run tests: `npm vitest run`
 5. Commit and push
 
 ---
@@ -382,7 +382,5 @@ Confirm Sui CLI version is compatible with `edition = "2024.beta"`. Check with `
 ## Related Documentation
 
 - [README.md](../README.md) -- Project overview
-- [TECH_SPEC.md](../TECH_SPEC.md) -- Full technical specification
-- [IMPLEMENTATION_PLAN.md](../IMPLEMENTATION_PLAN.md) -- Implementation plan
 - [RUNBOOK.md](./RUNBOOK.md) -- Deployment and operations
 - [CLAUDE.md](../CLAUDE.md) -- Claude Code working guidelines

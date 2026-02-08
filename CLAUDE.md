@@ -1,4 +1,4 @@
-# AgentVault - CLAUDE.md
+# Suistody - CLAUDE.md
 
 ## Repository
 
@@ -6,8 +6,7 @@ https://github.com/ARZER-TW/agent-vault
 
 ## 專案快速指引
 
-- 讀取 `TECH_SPEC.md` 了解核心目標和設計理念
-- 讀取 `IMPLEMENTATION_PLAN.md` 了解原始實作計畫
+- 讀取 `README.md` 了解核心目標和架構
 - 讀取 `docs/CONTRIB.md` 了解開發流程和測試指南
 - 讀取 `docs/RUNBOOK.md` 了解部署和維運
 
