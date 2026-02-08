@@ -1,6 +1,6 @@
 import { getSuiClient } from "@/lib/sui/client";
 import { PACKAGE_ID, MODULE_NAME } from "@/lib/constants";
-import type { VaultData, AgentCapData, OwnerCapData, Policy } from "./types";
+import type { VaultData, AgentCapData, OwnerCapData, Policy, VaultEvent } from "./types";
 
 const VAULT_TYPE = `${PACKAGE_ID}::${MODULE_NAME}::Vault`;
 const AGENT_CAP_TYPE = `${PACKAGE_ID}::${MODULE_NAME}::AgentCap`;
@@ -185,4 +185,34 @@ export async function getOwnedVaults(ownerAddress: string): Promise<VaultData[]>
   return vaults;
 }
 
+/**
+ * Fetch on-chain AgentWithdrawal events for a given Vault.
+ */
+export async function getVaultEvents(vaultId: string): Promise<VaultEvent[]> {
+  const client = getSuiClient();
+  const events = await client.queryEvents({
+    query: {
+      MoveEventType: `${PACKAGE_ID}::agent_vault::AgentWithdrawal`,
+    },
+    order: "descending",
+    limit: 50,
+  });
 
+  return events.data
+    .filter((e) => {
+      const parsed = e.parsedJson as Record<string, unknown> | undefined;
+      return parsed?.vault_id === vaultId;
+    })
+    .map((e) => {
+      const p = e.parsedJson as Record<string, unknown>;
+      return {
+        txDigest: e.id.txDigest,
+        amount: Number(p.amount),
+        actionType: Number(p.action_type),
+        totalSpent: Number(p.total_spent),
+        remainingBudget: Number(p.remaining_budget),
+        txCount: Number(p.tx_count),
+        timestamp: Number(p.timestamp),
+      };
+    });
+}

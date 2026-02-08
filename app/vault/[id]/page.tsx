@@ -13,6 +13,7 @@ import { DemoModePanel } from "@/components/vault/demo-mode-panel";
 import { GuardrailStressTest } from "@/components/vault/guardrail-stress-test";
 import { StrategyInput } from "@/components/vault/strategy-input";
 import { AutoRunControls } from "@/components/vault/auto-run-controls";
+import { OnChainAudit } from "@/components/vault/on-chain-audit";
 import { useAuthStore } from "@/lib/store/auth-store";
 import { useVaultStore } from "@/lib/store/vault-store";
 import { getVault, getAgentCaps, getOwnerCaps } from "@/lib/vault/service";
@@ -373,6 +374,9 @@ export default function VaultDetailPage() {
 
               <AgentActivityLog />
             </div>
+
+            {/* On-Chain Audit Trail */}
+            <OnChainAudit vaultId={vaultId} />
           </div>
         )}
       </main>

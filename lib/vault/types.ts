@@ -27,6 +27,16 @@ export interface OwnerCapData {
   vaultId: string;
 }
 
+export interface VaultEvent {
+  txDigest: string;
+  amount: number;
+  actionType: number;
+  totalSpent: number;
+  remainingBudget: number;
+  txCount: number;
+  timestamp: number;
+}
+
 /**
  * Client-safe log entry for agent activity display.
  * Matches the shape returned by /api/agent/run (JSON-serializable, no server-only types).
