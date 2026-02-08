@@ -64,21 +64,21 @@ export function LogEntry({ result, index }: LogEntryProps) {
       {/* Header row: index, status tag, action, timestamp, confidence */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-mono text-gray-600">
+          <span className="text-xs font-mono text-gray-600">
             #{String(index + 1).padStart(2, "0")}
           </span>
           <span
-            className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${status.tagBg} ${status.tagColor} border ${status.tagBorder}`}
+            className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded ${status.tagBg} ${status.tagColor} border ${status.tagBorder}`}
           >
             {status.tag}
           </span>
           <span
-            className={`text-xs font-mono font-bold px-2 py-0.5 rounded-md ${status.actionBg} ${status.actionColor} border ${status.actionBorder}`}
+            className={`text-sm font-mono font-bold px-2 py-0.5 rounded-md ${status.actionBg} ${status.actionColor} border ${status.actionBorder}`}
           >
             {status.label}
           </span>
           {result.timestamp && (
-            <span className="text-[10px] font-mono text-gray-600">
+            <span className="text-xs font-mono text-gray-600">
               {new Date(result.timestamp).toLocaleTimeString()}
             </span>
           )}
@@ -90,20 +90,20 @@ export function LogEntry({ result, index }: LogEntryProps) {
               style={{ width: `${decision.confidence * 100}%` }}
             />
           </div>
-          <span className="text-[10px] font-mono text-gray-500">
+          <span className="text-xs font-mono text-gray-500">
             {(decision.confidence * 100).toFixed(0)}%
           </span>
         </div>
       </div>
 
       {/* Reasoning */}
-      <p className="text-sm text-gray-400 leading-relaxed mb-3">
+      <p className="text-base text-gray-400 leading-relaxed mb-3">
         {decision.reasoning}
       </p>
 
       {/* Params */}
       {decision.params && (
-        <div className="flex gap-3 text-[11px] font-mono text-gray-500 mb-3">
+        <div className="flex gap-3 text-sm font-mono text-gray-500 mb-3">
           <span>Amount: {decision.params.amount} SUI</span>
           {decision.params.minOut && (
             <span>Min Out: {decision.params.minOut}</span>
@@ -113,7 +113,7 @@ export function LogEntry({ result, index }: LogEntryProps) {
 
       {/* Blocked indicator */}
       {!policyCheck.allowed && (
-        <div className="flex items-center gap-2 text-xs text-red-400 bg-red-500/5 border border-red-500/10 px-3 py-2 rounded-lg">
+        <div className="flex items-center gap-2 text-sm text-red-400 bg-red-500/5 border border-red-500/10 px-3 py-2 rounded-lg">
           <svg
             width="14"
             height="14"
@@ -134,7 +134,7 @@ export function LogEntry({ result, index }: LogEntryProps) {
 
       {/* Success indicator with TX link */}
       {policyCheck.allowed && decision.action !== "hold" && (
-        <div className="flex items-center justify-between text-xs text-emerald-400 bg-emerald-500/5 border border-emerald-500/10 px-3 py-2 rounded-lg">
+        <div className="flex items-center justify-between text-sm text-emerald-400 bg-emerald-500/5 border border-emerald-500/10 px-3 py-2 rounded-lg">
           <div className="flex items-center gap-2">
             <svg
               width="14"

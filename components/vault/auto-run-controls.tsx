@@ -159,13 +159,13 @@ export function AutoRunControls({
     <div className="mb-4 p-4 rounded-xl border border-vault-border bg-void/30">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-mono text-gray-500 uppercase tracking-wider">
+          <span className="text-xs font-mono text-gray-500 uppercase tracking-wider">
             Auto-Run
           </span>
           {isAutoRunEnabled && (
             <span className="flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-[10px] font-mono text-emerald-400">
+              <span className="text-xs font-mono text-emerald-400">
                 Active
               </span>
             </span>
@@ -190,7 +190,7 @@ export function AutoRunControls({
 
       {/* Interval Selector */}
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-[10px] font-mono text-gray-600">Interval:</span>
+        <span className="text-xs font-mono text-gray-600">Interval:</span>
         <div className="flex gap-1">
           {INTERVAL_OPTIONS.map((opt) => (
             <button
@@ -199,7 +199,7 @@ export function AutoRunControls({
                 if (!isAutoRunEnabled) setIntervalSec(opt.value);
               }}
               disabled={isAutoRunEnabled}
-              className={`px-2.5 py-1 rounded text-[10px] font-mono transition-colors ${
+              className={`px-2.5 py-1 rounded text-xs font-mono transition-colors ${
                 intervalSec === opt.value
                   ? "bg-accent/20 text-accent border border-accent/30"
                   : "bg-elevated text-gray-500 border border-transparent hover:text-gray-400"
@@ -217,10 +217,10 @@ export function AutoRunControls({
       {isAutoRunEnabled && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono text-gray-600">
+            <span className="text-xs font-mono text-gray-600">
               Cycles completed: {cycleCount}
             </span>
-            <span className="text-[10px] font-mono text-gray-500">
+            <span className="text-xs font-mono text-gray-500">
               {isRunning ? (
                 <span className="flex items-center gap-1">
                   <span className="w-2 h-2 border border-accent/30 border-t-accent rounded-full animate-spin" />
@@ -241,7 +241,7 @@ export function AutoRunControls({
           </div>
 
           {lastError && (
-            <p className="text-[10px] font-mono text-red-400 truncate" title={lastError}>
+            <p className="text-xs font-mono text-red-400 truncate" title={lastError}>
               Last error: {lastError}
             </p>
           )}

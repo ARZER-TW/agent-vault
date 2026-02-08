@@ -80,10 +80,10 @@ export function DemoModePanel({
     <div className="mb-4 p-4 rounded-xl border border-vault-border bg-void/30">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-mono text-gray-500 uppercase tracking-wider">
+          <span className="text-xs font-mono text-gray-500 uppercase tracking-wider">
             Demo Mode
           </span>
-          <span className="text-[10px] font-mono text-gray-600">
+          <span className="text-xs font-mono text-gray-600">
             (skip AI, test policy directly)
           </span>
         </div>
@@ -111,13 +111,13 @@ export function DemoModePanel({
               placeholder="Amount in SUI"
               step="0.01"
               min="0"
-              className="vault-input text-sm flex-1"
+              className="vault-input text-base flex-1"
               aria-label="Demo swap amount in SUI"
             />
             <button
               onClick={() => handleDemoRun(parseFloat(demoAmount || "0"))}
               disabled={isRunning || !demoAmount || parseFloat(demoAmount) <= 0 || !activeAgentCap}
-              className="btn-primary text-sm"
+              className="btn-primary text-base"
               aria-label="Run demo transaction"
             >
               {isRunning ? "Running..." : "Test"}
@@ -131,7 +131,7 @@ export function DemoModePanel({
                 handleDemoRun(overLimit);
               }}
               disabled={isRunning || !activeAgentCap}
-              className="flex-1 px-3 py-2 rounded-lg text-xs font-mono bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+              className="flex-1 px-3 py-2.5 rounded-lg text-sm font-mono bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors disabled:opacity-50"
               aria-label="Test with amount exceeding per-transaction limit"
             >
               Test Over-Limit
@@ -143,7 +143,7 @@ export function DemoModePanel({
                 handleDemoRun(normal);
               }}
               disabled={isRunning || !activeAgentCap}
-              className="flex-1 px-3 py-2 rounded-lg text-xs font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
+              className="flex-1 px-3 py-2.5 rounded-lg text-sm font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
               aria-label="Test with normal amount within limits"
             >
               Test Normal

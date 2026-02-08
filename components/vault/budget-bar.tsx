@@ -28,10 +28,10 @@ export function BudgetBar({ totalSpent, maxBudget }: BudgetBarProps) {
   return (
     <div className="glass-card p-6 animate-fade-in-up">
       <div className="flex items-center justify-between mb-3">
-        <p className="text-[10px] font-mono text-gray-500 uppercase tracking-wider">
+        <p className="text-xs font-mono text-gray-500 uppercase tracking-wider">
           Budget Utilization
         </p>
-        <span className={`text-sm font-mono font-bold ${getPctTextClass(pct)}`}>
+        <span className={`text-base font-mono font-bold ${getPctTextClass(pct)}`}>
           {spentSui} / {budgetSui} SUI ({pct}%)
         </span>
       </div>
@@ -52,7 +52,7 @@ export function BudgetBar({ totalSpent, maxBudget }: BudgetBarProps) {
           }}
         />
       </div>
-      <div className="flex justify-between mt-2 text-[10px] font-mono text-gray-600">
+      <div className="flex justify-between mt-2 text-xs font-mono text-gray-600">
         <span>0 SUI</span>
         <span>{budgetSui} SUI</span>
       </div>

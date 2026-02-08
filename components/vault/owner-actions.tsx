@@ -155,13 +155,13 @@ export function OwnerActions({
 
   return (
     <div className="glass-card p-6 animate-fade-in-up">
-      <h2 className="text-[10px] font-mono font-medium text-gray-500 uppercase tracking-wider mb-4">
+      <h2 className="text-sm font-mono font-medium text-gray-500 uppercase tracking-wider mb-4">
         Owner Actions
       </h2>
       <div className="flex flex-wrap gap-3">
         <button
           onClick={() => setShowDepositForm(!showDepositForm)}
-          className="px-4 py-2 rounded-lg text-sm font-mono bg-accent/10 text-accent border border-accent/20 hover:bg-accent/20 transition-colors"
+          className="px-4 py-2.5 rounded-lg text-base font-mono bg-accent/10 text-accent border border-accent/20 hover:bg-accent/20 transition-colors"
           aria-label="Toggle deposit form"
         >
           Deposit SUI
@@ -170,7 +170,7 @@ export function OwnerActions({
         <button
           onClick={handleWithdrawAll}
           disabled={isWithdrawing || vault.balance <= 0n}
-          className="px-4 py-2 rounded-lg text-sm font-mono bg-amber/10 text-amber border border-amber/20 hover:bg-amber/20 transition-colors disabled:opacity-50"
+          className="px-4 py-2.5 rounded-lg text-base font-mono bg-amber/10 text-amber border border-amber/20 hover:bg-amber/20 transition-colors disabled:opacity-50"
           aria-label="Withdraw all funds from vault"
         >
           {isWithdrawing ? "Withdrawing..." : "Withdraw All"}
@@ -180,7 +180,7 @@ export function OwnerActions({
           <button
             onClick={handleRevokeAgent}
             disabled={isRevoking}
-            className="px-4 py-2 rounded-lg text-sm font-mono bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+            className="px-4 py-2.5 rounded-lg text-base font-mono bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors disabled:opacity-50"
             aria-label="Revoke agent authorization"
           >
             {isRevoking ? "Revoking..." : "Revoke Agent"}
@@ -197,13 +197,13 @@ export function OwnerActions({
             placeholder="Amount in SUI"
             step="0.01"
             min="0.01"
-            className="vault-input text-sm flex-1"
+            className="vault-input text-base flex-1"
             aria-label="Deposit amount in SUI"
           />
           <button
             onClick={handleDeposit}
             disabled={isDepositing || !depositAmount || parseFloat(depositAmount) <= 0}
-            className="btn-primary text-sm"
+            className="btn-primary text-base"
             aria-label="Confirm deposit"
           >
             {isDepositing ? "Depositing..." : "Confirm"}
@@ -216,17 +216,17 @@ export function OwnerActions({
         <div className="mt-4 p-4 rounded-xl border border-accent/20 bg-accent/5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-white mb-1">
+              <p className="text-base font-medium text-white mb-1">
                 Authorize AI Agent
               </p>
-              <p className="text-[11px] text-gray-500 font-mono">
+              <p className="text-sm text-gray-500 font-mono">
                 Agent: {agentAddress.slice(0, 10)}...{agentAddress.slice(-6)}
               </p>
             </div>
             <button
               onClick={handleMintAgentCap}
               disabled={isMinting}
-              className="btn-primary text-sm"
+              className="btn-primary text-base"
               aria-label="Mint AgentCap NFT to authorize AI agent"
             >
               {isMinting ? (

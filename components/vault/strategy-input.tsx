@@ -36,16 +36,16 @@ export function StrategyInput({ strategy, onStrategyChange }: StrategyInputProps
     <div className="glass-card p-6 animate-fade-in-up">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-[10px] font-mono font-medium text-gray-500 uppercase tracking-wider mb-1">
+          <h2 className="text-xs font-mono font-medium text-gray-500 uppercase tracking-wider mb-1">
             Natural Language Strategy
           </h2>
-          <p className="text-[11px] text-gray-600 font-mono">
+          <p className="text-sm text-gray-600 font-mono">
             Tell the AI how to trade in plain language
           </p>
         </div>
         <div className="flex items-center gap-2">
           {strategy.length > 0 && (
-            <span className="text-[10px] font-mono text-accent">Active</span>
+            <span className="text-xs font-mono text-accent">Active</span>
           )}
           <button
             onClick={() => setIsOpen(!isOpen)}
@@ -67,7 +67,7 @@ export function StrategyInput({ strategy, onStrategyChange }: StrategyInputProps
               <button
                 key={preset.label}
                 onClick={() => onStrategyChange(preset.value)}
-                className={`px-3 py-1.5 rounded-lg text-[11px] font-mono border transition-colors ${
+                className={`px-3 py-1.5 rounded-lg text-sm font-mono border transition-colors ${
                   strategy === preset.value
                     ? "border-accent/40 bg-accent/10 text-accent"
                     : "border-vault-border bg-void/30 text-gray-500 hover:border-accent/20 hover:text-gray-400"
@@ -86,10 +86,10 @@ export function StrategyInput({ strategy, onStrategyChange }: StrategyInputProps
               placeholder="e.g., Only swap when SUI price is above $3.50, keep 50% of budget in reserve..."
               rows={3}
               maxLength={500}
-              className="vault-input text-sm w-full resize-none font-mono"
+              className="vault-input text-base w-full resize-none font-mono"
             />
             <span
-              className={`absolute bottom-2 right-3 text-[10px] font-mono ${
+              className={`absolute bottom-2 right-3 text-xs font-mono ${
                 isOverLimit ? "text-red-400" : "text-gray-600"
               }`}
             >
@@ -102,7 +102,7 @@ export function StrategyInput({ strategy, onStrategyChange }: StrategyInputProps
             <div className="flex justify-end">
               <button
                 onClick={() => onStrategyChange("")}
-                className="text-[11px] font-mono text-gray-600 hover:text-gray-400 transition-colors"
+                className="text-sm font-mono text-gray-600 hover:text-gray-400 transition-colors"
               >
                 Clear strategy
               </button>
@@ -112,10 +112,10 @@ export function StrategyInput({ strategy, onStrategyChange }: StrategyInputProps
           {/* Active Strategy Preview */}
           {strategy.length > 0 && (
             <div className="p-3 rounded-xl border border-accent/20 bg-accent/5">
-              <p className="text-[10px] font-mono text-accent/60 uppercase tracking-wider mb-1">
+              <p className="text-xs font-mono text-accent/60 uppercase tracking-wider mb-1">
                 Active Strategy
               </p>
-              <p className="text-[11px] text-gray-400 font-mono leading-relaxed">
+              <p className="text-sm text-gray-400 font-mono leading-relaxed">
                 {strategy}
               </p>
             </div>

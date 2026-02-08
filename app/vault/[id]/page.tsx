@@ -165,13 +165,13 @@ export default function VaultDetailPage() {
             {/* Vault Header */}
             <div className="flex items-start justify-between animate-fade-in-up">
               <div>
-                <p className="text-xs font-mono font-medium text-accent tracking-widest uppercase mb-2">
+                <p className="text-sm font-mono font-medium text-accent tracking-widest uppercase mb-2">
                   Vault Detail
                 </p>
-                <h1 className="font-display font-bold text-3xl text-white mb-2">
+                <h1 className="font-display font-bold text-4xl text-white mb-2">
                   Vault Overview
                 </h1>
-                <p className="text-sm font-mono text-gray-500">
+                <p className="text-base font-mono text-gray-500">
                   {vault.id}
                 </p>
               </div>
@@ -225,7 +225,7 @@ export default function VaultDetailPage() {
 
             {/* Policy Details */}
             <div className="glass-card p-6 animate-fade-in-up">
-              <h2 className="text-[10px] font-mono font-medium text-gray-500 uppercase tracking-wider mb-4">
+              <h2 className="text-sm font-mono font-medium text-gray-500 uppercase tracking-wider mb-4">
                 Policy Configuration
               </h2>
               <div className="divide-y divide-vault-border">
@@ -285,27 +285,27 @@ export default function VaultDetailPage() {
             <div className="glass-card p-6 animate-fade-in-up">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h2 className="text-[10px] font-mono font-medium text-gray-500 uppercase tracking-wider mb-2">
+                  <h2 className="text-sm font-mono font-medium text-gray-500 uppercase tracking-wider mb-2">
                     AI Agent Runtime
                   </h2>
                   {activeAgentCap ? (
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                      <span className="text-xs font-mono text-emerald-400">
+                      <span className="text-sm font-mono text-emerald-400">
                         AgentCap: {activeAgentCap.id.slice(0, 10)}...
                       </span>
                     </div>
                   ) : address ? (
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-amber" />
-                      <span className="text-xs text-amber">
+                      <span className="text-sm text-amber">
                         No authorized AgentCap found
                       </span>
                     </div>
                   ) : (
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-gray-600" />
-                      <span className="text-xs text-gray-500">
+                      <span className="text-sm text-gray-500">
                         Login to run the agent
                       </span>
                     </div>

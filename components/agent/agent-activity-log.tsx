@@ -14,16 +14,16 @@ interface LogSummary {
 function SummaryBar({ summary }: { summary: LogSummary }) {
   return (
     <div className="flex items-center gap-4 px-4 py-2.5 border-b border-vault-border bg-deep/50">
-      <span className="text-[10px] font-mono text-gray-400">
+      <span className="text-xs font-mono text-gray-400">
         Total: <span className="text-white font-bold">{summary.total}</span>
       </span>
-      <span className="text-[10px] font-mono" style={{ color: "var(--color-accent)" }}>
+      <span className="text-xs font-mono" style={{ color: "var(--color-accent)" }}>
         OK: {summary.success}
       </span>
-      <span className="text-[10px] font-mono" style={{ color: "var(--color-amber)" }}>
+      <span className="text-xs font-mono" style={{ color: "var(--color-amber)" }}>
         Blocked: {summary.blocked}
       </span>
-      <span className="text-[10px] font-mono text-gray-500">
+      <span className="text-xs font-mono text-gray-500">
         Hold: {summary.hold}
       </span>
     </div>
@@ -58,13 +58,13 @@ export function AgentActivityLog() {
           <div className="terminal-dot bg-red-500/60" />
           <div className="terminal-dot bg-amber/60" />
           <div className="terminal-dot bg-emerald-500/60" />
-          <span className="ml-2 text-[10px] text-gray-500">agent-runtime</span>
+          <span className="ml-2 text-xs text-gray-500">agent-runtime</span>
         </div>
         <div className="p-6 text-center">
-          <p className="text-sm text-gray-500">
+          <p className="text-base text-gray-500">
             No agent activity yet.
           </p>
-          <p className="text-xs text-gray-600 mt-1">
+          <p className="text-sm text-gray-600 mt-1">
             Run the agent to see AI trading decisions here.
           </p>
         </div>
@@ -78,10 +78,10 @@ export function AgentActivityLog() {
         <div className="terminal-dot bg-red-500/60" />
         <div className="terminal-dot bg-amber/60" />
         <div className="terminal-dot bg-emerald-500/60" />
-        <span className="ml-2 text-[10px] text-gray-500">agent-runtime</span>
+        <span className="ml-2 text-xs text-gray-500">agent-runtime</span>
         <button
           onClick={clearAgentLogs}
-          className="ml-auto text-[10px] text-gray-600 hover:text-gray-400 transition-colors font-mono"
+          className="ml-auto text-xs text-gray-600 hover:text-gray-400 transition-colors font-mono"
           aria-label="Clear agent activity log"
         >
           clear

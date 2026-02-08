@@ -159,10 +159,10 @@ export function GuardrailStressTest({ vault, addToast }: GuardrailStressTestProp
     <div className="glass-card p-6 animate-fade-in-up">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-[10px] font-mono font-medium text-gray-500 uppercase tracking-wider mb-1">
+          <h2 className="text-xs font-mono font-medium text-gray-500 uppercase tracking-wider mb-1">
             Guardrail Stress Test
           </h2>
-          <p className="text-[11px] text-gray-600 font-mono">
+          <p className="text-sm text-gray-600 font-mono">
             Verify policy enforcement with adversarial scenarios
           </p>
         </div>
@@ -193,7 +193,7 @@ export function GuardrailStressTest({ vault, addToast }: GuardrailStressTestProp
           <button
             onClick={runAllTests}
             disabled={isRunningAll}
-            className="w-full px-4 py-3 rounded-xl text-sm font-mono font-medium bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+            className="w-full px-4 py-3 rounded-xl text-base font-mono font-medium bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors disabled:opacity-50"
             aria-label="Run all guardrail stress tests"
           >
             {isRunningAll ? (
@@ -241,7 +241,7 @@ export function GuardrailStressTest({ vault, addToast }: GuardrailStressTestProp
                 </span>
                 <div>
                   <p
-                    className={`text-sm font-medium ${
+                    className={`text-base font-medium ${
                       blockedCount === completedCount ? "text-emerald-400" : "text-red-400"
                     }`}
                   >
@@ -249,7 +249,7 @@ export function GuardrailStressTest({ vault, addToast }: GuardrailStressTestProp
                       ? "All Guardrails Holding"
                       : "Guardrail Breach Detected"}
                   </p>
-                  <p className="text-[11px] text-gray-500 font-mono">
+                  <p className="text-sm text-gray-500 font-mono">
                     {blockedCount === completedCount
                       ? "Smart contract policy enforcement is working correctly"
                       : "Some adversarial scenarios were not blocked"}
@@ -320,15 +320,15 @@ function TestRow({
 
         {/* Info */}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-white">{config.label}</p>
-          <p className="text-[11px] text-gray-500 font-mono truncate">{config.shortDesc}</p>
+          <p className="text-base font-medium text-white">{config.label}</p>
+          <p className="text-sm text-gray-500 font-mono truncate">{config.shortDesc}</p>
         </div>
 
         {/* Status + Actions */}
         <div className="flex items-center gap-2 shrink-0">
           {state.status === "done" && (
             <span
-              className={`text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
+              className={`text-xs font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
                 state.result?.blocked
                   ? "bg-emerald-500/20 text-emerald-400"
                   : state.error
@@ -378,17 +378,17 @@ function TestRow({
       {isExpanded && state.result && (
         <div className="px-4 pb-3 border-t border-vault-border/50">
           <div className="pt-3 space-y-2">
-            <p className="text-[11px] text-gray-400 font-mono">{state.result.description}</p>
+            <p className="text-sm text-gray-400 font-mono">{state.result.description}</p>
             <div className="space-y-1">
               {Object.entries(state.result.attempted).map(([key, val]) => (
                 <div key={key} className="flex items-center justify-between">
-                  <span className="text-[10px] text-gray-600 font-mono">{key}</span>
-                  <span className="text-[10px] text-gray-400 font-mono">{String(val)}</span>
+                  <span className="text-xs text-gray-600 font-mono">{key}</span>
+                  <span className="text-xs text-gray-400 font-mono">{String(val)}</span>
                 </div>
               ))}
             </div>
             <div className="pt-1">
-              <p className="text-[11px] font-mono text-gray-500">
+              <p className="text-sm font-mono text-gray-500">
                 <span className="text-gray-600">Result: </span>
                 {state.result.reason}
               </p>
@@ -400,7 +400,7 @@ function TestRow({
       {/* Error State */}
       {isExpanded && state.error && (
         <div className="px-4 pb-3 border-t border-vault-border/50">
-          <p className="pt-3 text-[11px] text-amber font-mono">{state.error}</p>
+          <p className="pt-3 text-sm text-amber font-mono">{state.error}</p>
         </div>
       )}
     </div>
