@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const agentKeyStr = process.env.AGENT_PRIVATE_KEY;
+  const agentKeyStr = process.env.AGENT_PRIVATE_KEY?.trim();
   if (!agentKeyStr) {
     return NextResponse.json(
       { success: false, error: "AGENT_PRIVATE_KEY is not configured" },

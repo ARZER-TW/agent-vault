@@ -87,7 +87,7 @@ export async function executeSponsoredAgentTransaction(params: {
 }): Promise<string> {
   const { transaction, agentKeypair } = params;
 
-  const sponsorKeyStr = process.env.SPONSOR_PRIVATE_KEY;
+  const sponsorKeyStr = process.env.SPONSOR_PRIVATE_KEY?.trim();
   if (!sponsorKeyStr) {
     throw new Error("SPONSOR_PRIVATE_KEY is not set");
   }

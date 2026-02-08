@@ -224,7 +224,7 @@ export async function POST(request: NextRequest) {
       recipientAddress: params.ownerAddress,
     });
 
-    const agentKeyStr = process.env.AGENT_PRIVATE_KEY;
+    const agentKeyStr = process.env.AGENT_PRIVATE_KEY?.trim();
     if (!agentKeyStr) {
       return NextResponse.json(
         { success: false, error: "AGENT_PRIVATE_KEY is not set" },

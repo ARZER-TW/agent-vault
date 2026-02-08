@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { txBytes, userSignature } = SignAndExecuteSchema.parse(body);
 
-    const sponsorKeyStr = process.env.SPONSOR_PRIVATE_KEY;
+    const sponsorKeyStr = process.env.SPONSOR_PRIVATE_KEY?.trim();
     if (!sponsorKeyStr) {
       return NextResponse.json(
         { success: false, error: "Sponsor wallet not configured" },

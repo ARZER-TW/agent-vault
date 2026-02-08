@@ -111,7 +111,7 @@ function detectProvider(): LLMProvider {
 // -- Provider-specific call functions --
 
 async function callAnthropic(systemPrompt: string, userPrompt: string): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not set");
 
   const client = new Anthropic({ apiKey });
@@ -130,7 +130,7 @@ async function callAnthropic(systemPrompt: string, userPrompt: string): Promise<
 }
 
 async function callOpenAI(systemPrompt: string, userPrompt: string): Promise<string> {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) throw new Error("OPENAI_API_KEY is not set");
 
   const client = new OpenAI({ apiKey });
@@ -149,7 +149,7 @@ async function callOpenAI(systemPrompt: string, userPrompt: string): Promise<str
 }
 
 async function callGemini(systemPrompt: string, userPrompt: string): Promise<string> {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new Error("GEMINI_API_KEY is not set");
 
   const genAI = new GoogleGenerativeAI(apiKey);

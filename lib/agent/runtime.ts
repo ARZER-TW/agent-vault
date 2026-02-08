@@ -225,7 +225,7 @@ export async function runAgentCycle(params: {
   }
 
   // Step 7: Execute transaction on-chain
-  const agentKeyStr = process.env.AGENT_PRIVATE_KEY;
+  const agentKeyStr = process.env.AGENT_PRIVATE_KEY?.trim();
   if (!agentKeyStr) {
     return {
       decision,

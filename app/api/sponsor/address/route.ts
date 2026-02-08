@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const sponsorKeyStr = process.env.SPONSOR_PRIVATE_KEY;
+  const sponsorKeyStr = process.env.SPONSOR_PRIVATE_KEY?.trim();
   if (!sponsorKeyStr) {
     return NextResponse.json(
       { error: "Sponsor wallet not configured" },
