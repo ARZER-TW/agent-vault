@@ -50,6 +50,7 @@ export async function POST(request: NextRequest) {
           timestamp: result.orderBook.timestamp,
           source: result.orderBook.source,
         },
+        ...(result.error ? { error: result.error } : {}),
       },
     });
   } catch (error) {

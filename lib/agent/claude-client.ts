@@ -8,6 +8,18 @@ import { parseAgentDecision, type AgentDecision } from "./intent-parser";
 
 type LLMProvider = "anthropic" | "openai" | "gemini";
 
+const LLM_TIMEOUT_MS = 30_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    promise.then(
+      (val) => { clearTimeout(timer); resolve(val); },
+      (err) => { clearTimeout(timer); reject(err); },
+    );
+  });
+}
+
 const MODELS: Record<LLMProvider, string> = {
   anthropic: "claude-sonnet-4-20250514",
   openai: "gpt-4o",
@@ -166,6 +178,10 @@ export async function getAgentDecision(params: {
   const systemPrompt = buildSystemPrompt(params.strategy);
   const userPrompt = buildUserPrompt(params);
 
-  const rawText = await caller(systemPrompt, userPrompt);
+  const rawText = await withTimeout(
+    caller(systemPrompt, userPrompt),
+    LLM_TIMEOUT_MS,
+    `LLM call (${provider})`,
+  );
   return parseAgentDecision(rawText);
 }

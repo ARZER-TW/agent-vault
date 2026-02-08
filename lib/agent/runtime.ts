@@ -16,6 +16,11 @@ import {
 } from "@/lib/auth/sponsored-tx";
 import { getSuiClient } from "@/lib/sui/client";
 
+export interface AgentRunError {
+  step: "market_data" | "llm_decision" | "policy_check" | "ptb_build" | "tx_execute";
+  error: string;
+}
+
 export interface AgentRunResult {
   decision: AgentDecision;
   policyCheck: PolicyCheckResult;
@@ -23,6 +28,7 @@ export interface AgentRunResult {
   txDigest: string | null;
   vault: VaultData;
   orderBook: OrderBookSnapshot;
+  error?: AgentRunError;
 }
 
 /**
@@ -46,11 +52,32 @@ export async function runAgentCycle(params: {
   // Step 1: Fetch current vault state
   const vault = await getVault(vaultId);
 
-  // Step 2: Get market data
+  // Step 2: Get market data (fallback handled inside getOrderBook)
   const orderBook = await getOrderBook(agentAddress, DEEPBOOK_POOL_KEY);
 
-  // Step 3: Ask Claude for trading decision
-  const decision = await getAgentDecision({ vault, orderBook, strategy });
+  // Step 3: Ask LLM for trading decision (with timeout + parse fallback)
+  let decision: AgentDecision;
+  try {
+    decision = await getAgentDecision({ vault, orderBook, strategy });
+  } catch (llmError) {
+    const errorMsg = llmError instanceof Error ? llmError.message : String(llmError);
+    console.warn("[runtime] LLM decision failed, falling back to hold:", errorMsg);
+    decision = {
+      action: "hold",
+      reasoning: `[Fallback] LLM unavailable: ${errorMsg}`,
+      confidence: 0,
+      params: undefined,
+    };
+    return {
+      decision,
+      policyCheck: { allowed: true, reason: "Hold fallback - no transaction needed" },
+      transaction: null,
+      txDigest: null,
+      vault,
+      orderBook,
+      error: { step: "llm_decision", error: errorMsg },
+    };
+  }
 
   // Step 4: If hold, skip policy check and return
   if (decision.action === "hold") {
@@ -129,6 +156,35 @@ export async function runAgentCycle(params: {
       });
     } catch (swapBuildError) {
       // Fallback: simple withdraw if DeepBook swap build fails
+      try {
+        console.warn("[runtime] Swap PTB build failed, falling back to withdraw");
+        transaction = buildAgentWithdraw({
+          vaultId,
+          agentCapId,
+          amount: amountMist,
+          actionType: ACTION_SWAP,
+          recipientAddress: ownerAddress,
+        });
+      } catch (withdrawBuildError) {
+        const errorMsg = withdrawBuildError instanceof Error
+          ? withdrawBuildError.message
+          : String(withdrawBuildError);
+        console.warn("[runtime] PTB build failed entirely:", errorMsg);
+        return {
+          decision,
+          policyCheck,
+          transaction: null,
+          txDigest: null,
+          vault,
+          orderBook,
+          error: { step: "ptb_build", error: errorMsg },
+        };
+      }
+    }
+  } else {
+    // swap_usdc_to_sui - use simple withdraw
+    // (reverse swap via DeepBook would need swapExactQuoteForBase)
+    try {
       transaction = buildAgentWithdraw({
         vaultId,
         agentCapId,
@@ -136,23 +192,33 @@ export async function runAgentCycle(params: {
         actionType: ACTION_SWAP,
         recipientAddress: ownerAddress,
       });
+    } catch (buildError) {
+      const errorMsg = buildError instanceof Error ? buildError.message : String(buildError);
+      console.warn("[runtime] PTB build failed for reverse swap:", errorMsg);
+      return {
+        decision,
+        policyCheck,
+        transaction: null,
+        txDigest: null,
+        vault,
+        orderBook,
+        error: { step: "ptb_build", error: errorMsg },
+      };
     }
-  } else {
-    // swap_usdc_to_sui - use simple withdraw
-    // (reverse swap via DeepBook would need swapExactQuoteForBase)
-    transaction = buildAgentWithdraw({
-      vaultId,
-      agentCapId,
-      amount: amountMist,
-      actionType: ACTION_SWAP,
-      recipientAddress: ownerAddress,
-    });
   }
 
   // Step 7: Execute transaction on-chain
   const agentKeyStr = process.env.AGENT_PRIVATE_KEY;
   if (!agentKeyStr) {
-    throw new Error("AGENT_PRIVATE_KEY is not set");
+    return {
+      decision,
+      policyCheck,
+      transaction: null,
+      txDigest: null,
+      vault,
+      orderBook,
+      error: { step: "tx_execute", error: "AGENT_PRIVATE_KEY is not set" },
+    };
   }
   const agentKeypair = Ed25519Keypair.fromSecretKey(agentKeyStr);
 
@@ -173,9 +239,17 @@ export async function runAgentCycle(params: {
     } catch (directError) {
       const sponsoredMsg = sponsoredError instanceof Error ? sponsoredError.message : String(sponsoredError);
       const directMsg = directError instanceof Error ? directError.message : String(directError);
-      throw new Error(
-        `Transaction execution failed. Sponsored: ${sponsoredMsg}. Direct: ${directMsg}`
-      );
+      const errorMsg = `Sponsored: ${sponsoredMsg}. Direct: ${directMsg}`;
+      console.warn("[runtime] Transaction execution failed:", errorMsg);
+      return {
+        decision,
+        policyCheck,
+        transaction,
+        txDigest: null,
+        vault,
+        orderBook,
+        error: { step: "tx_execute", error: errorMsg },
+      };
     }
   }
 
