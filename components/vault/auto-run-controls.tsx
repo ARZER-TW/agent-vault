@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import type { VaultData, AgentCapData } from "@/lib/vault/types";
+import type { VaultData, AgentCapData, VaultApiFields } from "@/lib/vault/types";
 import { useVaultStore } from "@/lib/store/vault-store";
 
 const INTERVAL_OPTIONS = [
@@ -10,12 +10,6 @@ const INTERVAL_OPTIONS = [
   { label: "60s", value: 60 },
   { label: "120s", value: 120 },
 ];
-
-interface VaultApiFields {
-  balance: number;
-  totalSpent: number;
-  txCount: number;
-}
 
 interface AutoRunControlsProps {
   vault: VaultData;

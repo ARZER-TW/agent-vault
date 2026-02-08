@@ -243,5 +243,3 @@ export function clearAuthSession(): void {
   sessionStorage.removeItem(RANDOMNESS_KEY);
   sessionStorage.removeItem(MAX_EPOCH_KEY);
 }
-
-

@@ -41,6 +41,16 @@ export interface VaultEvent {
  * Client-safe log entry for agent activity display.
  * Matches the shape returned by /api/agent/run (JSON-serializable, no server-only types).
  */
+/**
+ * JSON-safe vault fields returned from API responses.
+ * Used for post-TX vault state updates on the client.
+ */
+export interface VaultApiFields {
+  balance: number;
+  totalSpent: number;
+  txCount: number;
+}
+
 export interface AgentLogEntry {
   decision: {
     action: "swap_sui_to_usdc" | "swap_usdc_to_sui" | "hold";

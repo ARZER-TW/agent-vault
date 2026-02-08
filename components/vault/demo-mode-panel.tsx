@@ -1,15 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import type { VaultData, AgentCapData } from "@/lib/vault/types";
+import type { VaultData, AgentCapData, VaultApiFields } from "@/lib/vault/types";
 import { useVaultStore } from "@/lib/store/vault-store";
 import { mistToSui } from "@/lib/constants";
-
-interface VaultApiFields {
-  balance: number;
-  totalSpent: number;
-  txCount: number;
-}
 
 interface DemoModePanelProps {
   vault: VaultData;

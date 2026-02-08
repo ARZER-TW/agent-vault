@@ -18,7 +18,7 @@ import { useAuthStore } from "@/lib/store/auth-store";
 import { useVaultStore } from "@/lib/store/vault-store";
 import { getVault, getAgentCaps, getOwnerCaps } from "@/lib/vault/service";
 import { mistToSui } from "@/lib/constants";
-import type { VaultData, AgentCapData, OwnerCapData } from "@/lib/vault/types";
+import type { VaultData, AgentCapData, OwnerCapData, VaultApiFields } from "@/lib/vault/types";
 
 export default function VaultDetailPage() {
   const params = useParams();
@@ -49,7 +49,7 @@ export default function VaultDetailPage() {
     setAgentCaps(vaultCaps);
   }, [vaultId]);
 
-  const handleVaultUpdate = useCallback((v: { balance: number; totalSpent: number; txCount: number }) => {
+  const handleVaultUpdate = useCallback((v: VaultApiFields) => {
     setVault((prev) =>
       prev
         ? {
