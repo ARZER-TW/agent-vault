@@ -154,7 +154,7 @@ export async function runAgentCycle(params: {
         deepAmount,
         poolKey: DEEPBOOK_POOL_KEY,
       });
-    } catch (swapBuildError) {
+    } catch {
       // Fallback: simple withdraw if DeepBook swap build fails
       try {
         console.warn("[runtime] Swap PTB build failed, falling back to withdraw");
