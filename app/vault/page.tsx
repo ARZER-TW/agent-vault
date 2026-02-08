@@ -3,15 +3,20 @@
 import { useEffect } from "react";
 import { Header } from "@/components/layout/header";
 import { VaultCard } from "@/components/vault/vault-card";
+import { WalletTransfer } from "@/components/wallet/wallet-transfer";
+import { ToastContainer, useToast } from "@/components/ui/toast";
 import { useAuthStore } from "@/lib/store/auth-store";
 import { useVaultStore } from "@/lib/store/vault-store";
 import { getOwnedVaults, getOwnerCaps } from "@/lib/vault/service";
 import Link from "next/link";
 
 export default function VaultListPage() {
-  const { address, isLoggedIn } = useAuthStore();
+  const { address, ephemeralKeypair, zkProof, maxEpoch, isLoggedIn } = useAuthStore();
   const { vaults, setVaults, setOwnerCaps, isLoading, setLoading } =
     useVaultStore();
+  const { toasts, addToast, dismissToast } = useToast();
+
+  const canSignTx = address && ephemeralKeypair && zkProof && maxEpoch !== null;
 
   useEffect(() => {
     if (!address) return;
@@ -40,8 +45,22 @@ export default function VaultListPage() {
   return (
     <div className="min-h-screen relative">
       <Header />
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
 
       <main className="max-w-5xl mx-auto px-6 py-12">
+        {/* Wallet Transfer */}
+        {canSignTx && (
+          <div className="mb-8">
+            <WalletTransfer
+              senderAddress={address!}
+              ephemeralKeypair={ephemeralKeypair!}
+              zkProof={zkProof!}
+              maxEpoch={maxEpoch!}
+              addToast={addToast}
+            />
+          </div>
+        )}
+
         {/* Page header */}
         <div className="flex items-end justify-between mb-8">
           <div>

@@ -111,25 +111,25 @@ export function WalletTransfer({
 
   return (
     <div className="glass-card p-6 animate-fade-in-up">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-[10px] font-mono font-medium text-gray-500 uppercase tracking-wider">
+      <div className="flex items-center justify-between mb-5">
+        <h2 className="text-xs font-mono font-medium text-gray-500 uppercase tracking-wider">
           Wallet Transfer
         </h2>
         <div className="text-right">
-          <span className="text-[10px] font-mono text-gray-500 uppercase tracking-wider">
+          <span className="text-xs font-mono text-gray-500 uppercase tracking-wider">
             Balance
           </span>
-          <p className="text-sm font-mono text-accent">
+          <p className="text-base font-mono text-accent">
             {isLoadingBalance ? "..." : `${mistToSui(balance).toFixed(4)} SUI`}
           </p>
         </div>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-4">
         <div>
           <label
             htmlFor="transfer-recipient"
-            className="text-[10px] font-mono text-gray-500 uppercase tracking-wider block mb-1"
+            className="text-xs font-mono text-gray-500 uppercase tracking-wider block mb-1.5"
           >
             Recipient Address
           </label>
@@ -139,11 +139,11 @@ export function WalletTransfer({
             value={recipient}
             onChange={(e) => setRecipient(e.target.value.trim())}
             placeholder="0x..."
-            className="vault-input text-sm w-full font-mono"
+            className="vault-input text-base w-full font-mono"
             aria-label="Recipient Sui address"
           />
           {recipient && !isAddressValid && (
-            <p className="text-[10px] text-red-400 mt-1 font-mono">
+            <p className="text-xs text-red-400 mt-1 font-mono">
               Invalid address format
             </p>
           )}
@@ -152,7 +152,7 @@ export function WalletTransfer({
         <div>
           <label
             htmlFor="transfer-amount"
-            className="text-[10px] font-mono text-gray-500 uppercase tracking-wider block mb-1"
+            className="text-xs font-mono text-gray-500 uppercase tracking-wider block mb-1.5"
           >
             Amount (SUI)
           </label>
@@ -164,7 +164,7 @@ export function WalletTransfer({
             placeholder="0.00"
             step="0.01"
             min="0.01"
-            className="vault-input text-sm w-full"
+            className="vault-input text-base w-full"
             aria-label="Transfer amount in SUI"
           />
         </div>
@@ -172,7 +172,7 @@ export function WalletTransfer({
         <button
           onClick={handleTransfer}
           disabled={!canTransfer}
-          className="btn-primary w-full text-sm"
+          className="btn-primary w-full"
           aria-label="Transfer SUI to recipient address"
         >
           {isTransferring ? (

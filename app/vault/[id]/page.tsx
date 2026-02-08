@@ -9,7 +9,6 @@ import { StatCard } from "@/components/vault/stat-card";
 import { PolicyRow } from "@/components/vault/policy-row";
 import { BudgetBar } from "@/components/vault/budget-bar";
 import { OwnerActions } from "@/components/vault/owner-actions";
-import { WalletTransfer } from "@/components/wallet/wallet-transfer";
 import { DemoModePanel } from "@/components/vault/demo-mode-panel";
 import { GuardrailStressTest } from "@/components/vault/guardrail-stress-test";
 import { StrategyInput } from "@/components/vault/strategy-input";
@@ -275,17 +274,6 @@ export default function VaultDetailPage() {
                 maxEpoch={maxEpoch!}
                 onRefreshVault={refreshVault}
                 onRefreshAgentCaps={refreshAgentCaps}
-                addToast={addToast}
-              />
-            )}
-
-            {/* Wallet Transfer */}
-            {canSignTx && (
-              <WalletTransfer
-                senderAddress={address!}
-                ephemeralKeypair={ephemeralKeypair!}
-                zkProof={zkProof!}
-                maxEpoch={maxEpoch!}
                 addToast={addToast}
               />
             )}
