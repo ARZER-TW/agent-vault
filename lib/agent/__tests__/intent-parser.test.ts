@@ -114,4 +114,91 @@ describe("parseAgentDecision", () => {
     const result = AgentDecisionSchema.safeParse(valid);
     expect(result.success).toBe(true);
   });
+
+  it("handles large JSON string (> 10KB)", () => {
+    const longReasoning = "A".repeat(15_000);
+    const input = JSON.stringify({
+      action: "hold",
+      reasoning: longReasoning,
+      confidence: 0.5,
+    });
+
+    const result = parseAgentDecision(input);
+    expect(result.reasoning).toBe(longReasoning);
+    expect(result.reasoning.length).toBe(15_000);
+  });
+
+  it("handles Unicode characters in reasoning", () => {
+    const input = JSON.stringify({
+      action: "hold",
+      reasoning: "Market analysis: bearish trend detected",
+      confidence: 0.4,
+    });
+
+    const result = parseAgentDecision(input);
+    expect(result.reasoning).toContain("bearish");
+  });
+
+  it("handles CJK characters in reasoning", () => {
+    const input = JSON.stringify({
+      action: "swap_sui_to_usdc",
+      reasoning: "SUI price is low, good time to buy",
+      confidence: 0.7,
+      params: { amount: "1.0" },
+    });
+
+    const result = parseAgentDecision(input);
+    expect(result.action).toBe("swap_sui_to_usdc");
+  });
+
+  it("takes first code block when multiple exist", () => {
+    const input = `Here is my analysis:
+\`\`\`json
+{"action":"hold","reasoning":"first block","confidence":0.5}
+\`\`\`
+And another option:
+\`\`\`json
+{"action":"swap_sui_to_usdc","reasoning":"second block","confidence":0.9,"params":{"amount":"1.0"}}
+\`\`\``;
+
+    const result = parseAgentDecision(input);
+    expect(result.reasoning).toBe("first block");
+  });
+
+  it("handles JSON with escaped quotes in strings", () => {
+    const input = JSON.stringify({
+      action: "hold",
+      reasoning: 'Market says "wait" for now',
+      confidence: 0.3,
+    });
+
+    const result = parseAgentDecision(input);
+    expect(result.reasoning).toContain('"wait"');
+  });
+
+  it("rejects negative confidence", () => {
+    const input = JSON.stringify({
+      action: "hold",
+      reasoning: "test",
+      confidence: -0.1,
+    });
+
+    expect(() => parseAgentDecision(input)).toThrow();
+  });
+
+  it("accepts boundary confidence values (0 and 1)", () => {
+    const input0 = JSON.stringify({
+      action: "hold",
+      reasoning: "zero confidence",
+      confidence: 0,
+    });
+    expect(parseAgentDecision(input0).confidence).toBe(0);
+
+    const input1 = JSON.stringify({
+      action: "hold",
+      reasoning: "full confidence",
+      confidence: 1,
+    });
+    expect(parseAgentDecision(input1).confidence).toBe(1);
+  });
 });
