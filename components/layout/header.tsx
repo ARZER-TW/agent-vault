@@ -68,7 +68,7 @@ export function Header() {
         {/* Desktop nav */}
         <nav className="hidden md:flex items-center gap-1" aria-label="Main navigation">
           {navLinks.map((link) => {
-            const isActive = pathname === link.href || pathname?.startsWith(link.href + "/");
+            const isActive = pathname === link.href;
             return (
               <Link
                 key={link.href}
@@ -115,7 +115,7 @@ export function Header() {
         <div className="md:hidden border-t border-vault-border bg-void/95 backdrop-blur-xl animate-fade-in-up">
           <nav className="max-w-6xl mx-auto px-6 py-4 space-y-2" aria-label="Mobile navigation">
             {navLinks.map((link) => {
-              const isActive = pathname === link.href || pathname?.startsWith(link.href + "/");
+              const isActive = pathname === link.href;
               return (
                 <Link
                   key={link.href}
