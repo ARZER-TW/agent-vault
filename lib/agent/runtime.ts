@@ -91,6 +91,23 @@ export async function runAgentCycle(params: {
     };
   }
 
+  // Step 4b: Confidence threshold - override to hold if too low
+  const MIN_CONFIDENCE = 0.5;
+  if (decision.confidence < MIN_CONFIDENCE) {
+    return {
+      decision: {
+        ...decision,
+        action: "hold" as const,
+        reasoning: `Low confidence (${(decision.confidence * 100).toFixed(0)}%), holding. Original: ${decision.reasoning}`,
+      },
+      policyCheck: { allowed: true, reason: "Low confidence - auto hold" },
+      transaction: null,
+      txDigest: null,
+      vault,
+      orderBook,
+    };
+  }
+
   // Step 5: Parse amount and check policy
   const amountSui = parseFloat(decision.params?.amount ?? "0");
   if (amountSui <= 0) {

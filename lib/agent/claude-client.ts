@@ -44,7 +44,9 @@ Rules:
 - Only use "swap_sui_to_usdc" or "swap_usdc_to_sui" if you see a clear opportunity
 - Use "hold" if market conditions are unclear or unfavorable
 - Never exceed the vault's remaining budget or per-tx limit
+- Position sizing: never trade more than 30% of the remaining budget in a single transaction
 - Consider the cooldown period between transactions
+- Set confidence below 0.5 only when you want to signal "hold" (the system auto-holds below 50%)
 - Be conservative with amounts - start small`;
 
 function buildSystemPrompt(strategy?: string): string {
@@ -67,10 +69,14 @@ function buildUserPrompt(params: {
   const { vault, orderBook } = params;
   const remainingBudget = vault.policy.maxBudget - vault.totalSpent;
 
+  const maxPositionSize = mistToSui(remainingBudget) * 0.3;
+  const effectiveMax = Math.min(maxPositionSize, mistToSui(vault.policy.maxPerTx));
+
   return `Current Vault State:
 - Balance: ${mistToSui(vault.balance)} SUI
-- Remaining Budget: ${mistToSui(remainingBudget)} SUI
-- Max Per TX: ${mistToSui(vault.policy.maxPerTx)} SUI
+- Remaining Budget: ${mistToSui(remainingBudget)} SUI (of ${mistToSui(vault.policy.maxBudget)} total)
+- Max Per TX (policy): ${mistToSui(vault.policy.maxPerTx)} SUI
+- Suggested Max Trade: ${effectiveMax.toFixed(4)} SUI (30% of remaining budget or per-tx limit, whichever is smaller)
 - Total Transactions: ${vault.txCount}
 - Policy Expires: ${new Date(vault.policy.expiresAt).toISOString()}
 
@@ -81,7 +87,7 @@ Market Data (SUI/DBUSDC):
 - Bid Depth (top 5): ${orderBook.bidPrices.slice(0, 5).map((p, i) => `${p}@${orderBook.bidQuantities[i]}`).join(", ")}
 - Ask Depth (top 5): ${orderBook.askPrices.slice(0, 5).map((p, i) => `${p}@${orderBook.askQuantities[i]}`).join(", ")}
 
-What trading action should I take?`;
+What trading action should I take? If confidence is below 50%, choose "hold".`;
 }
 
 /**
