@@ -122,6 +122,40 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Stats strip */}
+      <section className="relative max-w-3xl mx-auto px-6 -mt-6 mb-8">
+        <div
+          className="grid grid-cols-3 gap-4 animate-fade-in-up"
+          style={{ animationDelay: "500ms" }}
+        >
+          <div className="glass-card p-5 text-center">
+            <p className="font-display font-extrabold text-3xl gradient-text">
+              <span className="count-up-6" />
+            </p>
+            <p className="text-[10px] font-mono text-gray-500 uppercase tracking-wider mt-1">
+              Policy Dimensions
+            </p>
+          </div>
+          <div className="glass-card p-5 text-center">
+            <p className="font-display font-extrabold text-3xl gradient-text">
+              <span className="count-up-3" />
+            </p>
+            <p className="text-[10px] font-mono text-gray-500 uppercase tracking-wider mt-1">
+              Step Setup
+            </p>
+          </div>
+          <div className="glass-card p-5 text-center">
+            <p className="font-display font-extrabold text-3xl gradient-text">
+              <span className="count-up-100" />
+              <span className="text-lg">%</span>
+            </p>
+            <p className="text-[10px] font-mono text-gray-500 uppercase tracking-wider mt-1">
+              On-Chain Enforced
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* How it works */}
       <section className="relative max-w-5xl mx-auto px-6 py-24">
         <div className="text-center mb-16">

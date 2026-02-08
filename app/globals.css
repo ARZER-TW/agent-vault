@@ -189,6 +189,58 @@ body::before {
 .stagger-children > *:nth-child(5) { animation-delay: 320ms; }
 .stagger-children > *:nth-child(6) { animation-delay: 400ms; }
 
+/* Count-up animation using CSS @property */
+@property --counter-val {
+  syntax: '<integer>';
+  initial-value: 0;
+  inherits: false;
+}
+
+@keyframes countUp6 {
+  from { --counter-val: 0; }
+  to { --counter-val: 6; }
+}
+
+.count-up-6 {
+  animation: countUp6 1.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: 500ms;
+  counter-reset: num var(--counter-val);
+}
+
+.count-up-6::after {
+  content: counter(num);
+}
+
+@keyframes countUp3 {
+  from { --counter-val: 0; }
+  to { --counter-val: 3; }
+}
+
+.count-up-3 {
+  animation: countUp3 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: 700ms;
+  counter-reset: num var(--counter-val);
+}
+
+.count-up-3::after {
+  content: counter(num);
+}
+
+@keyframes countUp100 {
+  from { --counter-val: 0; }
+  to { --counter-val: 100; }
+}
+
+.count-up-100 {
+  animation: countUp100 2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: 600ms;
+  counter-reset: num var(--counter-val);
+}
+
+.count-up-100::after {
+  content: counter(num);
+}
+
 /* ============================================================
    Component Styles
    ============================================================ */
