@@ -63,7 +63,7 @@ export function Header() {
           </span>
         </Link>
 
-        <nav className="flex items-center gap-1">
+        <nav className="flex items-center gap-1" aria-label="Main navigation">
           {navLinks.map((link) => {
             const isActive = pathname === link.href || pathname?.startsWith(link.href + "/");
             return (

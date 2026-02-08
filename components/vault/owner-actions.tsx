@@ -162,6 +162,7 @@ export function OwnerActions({
         <button
           onClick={() => setShowDepositForm(!showDepositForm)}
           className="px-4 py-2 rounded-lg text-sm font-mono bg-accent/10 text-accent border border-accent/20 hover:bg-accent/20 transition-colors"
+          aria-label="Toggle deposit form"
         >
           Deposit SUI
         </button>
@@ -170,6 +171,7 @@ export function OwnerActions({
           onClick={handleWithdrawAll}
           disabled={isWithdrawing || vault.balance <= 0n}
           className="px-4 py-2 rounded-lg text-sm font-mono bg-amber/10 text-amber border border-amber/20 hover:bg-amber/20 transition-colors disabled:opacity-50"
+          aria-label="Withdraw all funds from vault"
         >
           {isWithdrawing ? "Withdrawing..." : "Withdraw All"}
         </button>
@@ -179,6 +181,7 @@ export function OwnerActions({
             onClick={handleRevokeAgent}
             disabled={isRevoking}
             className="px-4 py-2 rounded-lg text-sm font-mono bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+            aria-label="Revoke agent authorization"
           >
             {isRevoking ? "Revoking..." : "Revoke Agent"}
           </button>
@@ -195,11 +198,13 @@ export function OwnerActions({
             step="0.01"
             min="0.01"
             className="vault-input text-sm flex-1"
+            aria-label="Deposit amount in SUI"
           />
           <button
             onClick={handleDeposit}
             disabled={isDepositing || !depositAmount || parseFloat(depositAmount) <= 0}
             className="btn-primary text-sm"
+            aria-label="Confirm deposit"
           >
             {isDepositing ? "Depositing..." : "Confirm"}
           </button>
@@ -222,6 +227,7 @@ export function OwnerActions({
               onClick={handleMintAgentCap}
               disabled={isMinting}
               className="btn-primary text-sm"
+              aria-label="Mint AgentCap NFT to authorize AI agent"
             >
               {isMinting ? (
                 <>

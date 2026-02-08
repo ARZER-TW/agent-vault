@@ -175,6 +175,9 @@ export function GuardrailStressTest({ vault, addToast }: GuardrailStressTestProp
           <button
             onClick={() => setIsOpen(!isOpen)}
             className={`relative w-10 h-5 rounded-full transition-colors ${isOpen ? "bg-accent" : "bg-elevated"}`}
+            role="switch"
+            aria-checked={isOpen}
+            aria-label="Toggle guardrail stress test panel"
           >
             <span
               className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform"
@@ -191,6 +194,7 @@ export function GuardrailStressTest({ vault, addToast }: GuardrailStressTestProp
             onClick={runAllTests}
             disabled={isRunningAll}
             className="w-full px-4 py-3 rounded-xl text-sm font-mono font-medium bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+            aria-label="Run all guardrail stress tests"
           >
             {isRunningAll ? (
               <span className="flex items-center justify-center gap-2">
@@ -340,6 +344,7 @@ function TestRow({
             <button
               onClick={() => setIsExpanded(!isExpanded)}
               className="p-1 rounded hover:bg-white/5 transition-colors"
+              aria-label={`${isExpanded ? "Collapse" : "Expand"} ${config.label} test details`}
             >
               <svg
                 width="14"
@@ -359,7 +364,7 @@ function TestRow({
             <button
               onClick={onRun}
               className="p-1.5 rounded-lg hover:bg-white/5 transition-colors text-gray-500 hover:text-white"
-              title="Run this test"
+              aria-label={`Run ${config.label} test`}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                 <polygon points="5 3 19 12 5 21 5 3" />

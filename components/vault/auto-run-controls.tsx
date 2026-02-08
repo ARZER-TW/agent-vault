@@ -177,6 +177,9 @@ export function AutoRunControls({
           className={`relative w-10 h-5 rounded-full transition-colors disabled:opacity-50 ${
             isAutoRunEnabled ? "bg-emerald-500" : "bg-elevated"
           }`}
+          role="switch"
+          aria-checked={isAutoRunEnabled}
+          aria-label="Toggle auto-run mode"
         >
           <span
             className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform"
@@ -201,6 +204,8 @@ export function AutoRunControls({
                   ? "bg-accent/20 text-accent border border-accent/30"
                   : "bg-elevated text-gray-500 border border-transparent hover:text-gray-400"
               } disabled:cursor-default`}
+              aria-label={`Set auto-run interval to ${opt.label}`}
+              aria-pressed={intervalSec === opt.value}
             >
               {opt.label}
             </button>

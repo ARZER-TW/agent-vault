@@ -202,6 +202,7 @@ export function CreateVaultForm() {
           <button
             onClick={() => setTxDigest(null)}
             className="btn-primary w-full mt-6"
+            aria-label="Create another vault"
           >
             Create Another Vault
           </button>
@@ -252,6 +253,7 @@ export function CreateVaultForm() {
                 type="button"
                 onClick={reloadCoins}
                 className="text-xs text-accent hover:text-accent/80 transition-colors"
+                aria-label="Reload SUI coin list"
               >
                 Reload coins
               </button>

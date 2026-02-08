@@ -320,6 +320,7 @@ export default function VaultDetailPage() {
                     Date.now() >= vault.policy.expiresAt
                   }
                   className="btn-primary"
+                  aria-label="Run one AI agent trading cycle"
                 >
                   {isRunning ? (
                     <>
@@ -328,7 +329,7 @@ export default function VaultDetailPage() {
                     </>
                   ) : (
                     <>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                         <polygon points="5 3 19 12 5 21 5 3" />
                       </svg>
                       Run Agent Cycle

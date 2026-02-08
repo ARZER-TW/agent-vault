@@ -90,6 +90,9 @@ export function DemoModePanel({
         <button
           onClick={() => setIsDemoMode(!isDemoMode)}
           className={`relative w-10 h-5 rounded-full transition-colors ${isDemoMode ? "bg-accent" : "bg-elevated"}`}
+          role="switch"
+          aria-checked={isDemoMode}
+          aria-label="Toggle demo mode"
         >
           <span
             className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform"
@@ -109,11 +112,13 @@ export function DemoModePanel({
               step="0.01"
               min="0"
               className="vault-input text-sm flex-1"
+              aria-label="Demo swap amount in SUI"
             />
             <button
               onClick={() => handleDemoRun(parseFloat(demoAmount || "0"))}
               disabled={isRunning || !demoAmount || parseFloat(demoAmount) <= 0 || !activeAgentCap}
               className="btn-primary text-sm"
+              aria-label="Run demo transaction"
             >
               {isRunning ? "Running..." : "Test"}
             </button>
@@ -127,6 +132,7 @@ export function DemoModePanel({
               }}
               disabled={isRunning || !activeAgentCap}
               className="flex-1 px-3 py-2 rounded-lg text-xs font-mono bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+              aria-label="Test with amount exceeding per-transaction limit"
             >
               Test Over-Limit
             </button>
@@ -138,6 +144,7 @@ export function DemoModePanel({
               }}
               disabled={isRunning || !activeAgentCap}
               className="flex-1 px-3 py-2 rounded-lg text-xs font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
+              aria-label="Test with normal amount within limits"
             >
               Test Normal
             </button>
