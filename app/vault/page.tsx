@@ -33,7 +33,7 @@ export default function VaultListPage() {
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Failed to fetch vaults";
-        alert(message);
+        addToast("error", message);
       } finally {
         setLoading(false);
       }

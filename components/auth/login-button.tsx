@@ -16,7 +16,7 @@ export function LoginButton() {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Login failed";
-      alert(message);
+      console.error("[LoginButton]", message);
     } finally {
       setIsLoading(false);
     }

@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/lib/store/auth-store";
 import { buildCreateVault } from "@/lib/vault/ptb-builder";
 import { executeDirectZkLoginTransaction } from "@/lib/auth/sponsored-tx";
 import { suiToMist, mistToSui } from "@/lib/constants";
 import { getSuiCoins, type CoinItem } from "@/lib/sui/coins";
+import { useToast, ToastContainer } from "@/components/ui/toast";
 
 interface FormData {
   depositAmount: string;
@@ -40,8 +42,10 @@ function FormField({
 }
 
 export function CreateVaultForm() {
+  const router = useRouter();
   const { address, ephemeralKeypair, zkProof, maxEpoch, isLoggedIn } =
     useAuthStore();
+  const { toasts, addToast, dismissToast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [txDigest, setTxDigest] = useState<string | null>(null);
   const [coins, setCoins] = useState<CoinItem[]>([]);
@@ -109,6 +113,19 @@ export function CreateVaultForm() {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
+  function applyRecommended() {
+    setForm((prev) => ({
+      ...prev,
+      depositAmount: "1",
+      maxBudget: "0.5",
+      maxPerTx: "0.1",
+      cooldownSeconds: "60",
+      expiresInHours: "24",
+      allowSwap: true,
+    }));
+    addToast("info", "Recommended settings applied.");
+  }
+
   const selectedCoin = coins.find((c) => c.objectId === form.selectedCoinId);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -116,7 +133,7 @@ export function CreateVaultForm() {
     if (!address || !ephemeralKeypair || !zkProof || maxEpoch === null) return;
 
     if (!form.selectedCoinId) {
-      alert("Please select a SUI coin to deposit.");
+      addToast("error", "Please select a SUI coin to deposit.");
       return;
     }
 
@@ -152,11 +169,19 @@ export function CreateVaultForm() {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Transaction failed";
-      alert(message);
+      addToast("error", message);
     } finally {
       setIsSubmitting(false);
     }
   }
+
+  useEffect(() => {
+    if (!txDigest) return;
+    const timer = setTimeout(() => {
+      router.push("/vault");
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [txDigest, router]);
 
   if (!isLoggedIn) {
     return (
@@ -189,7 +214,7 @@ export function CreateVaultForm() {
             Vault Created
           </h2>
           <p className="text-sm text-gray-400 text-center mb-6">
-            Your policy-controlled vault is now live on Sui Testnet.
+            Your policy-controlled vault is now live on Sui Testnet. Redirecting to dashboard...
           </p>
           <div className="p-4 rounded-xl bg-void border border-vault-border">
             <p className="text-[10px] font-mono text-gray-500 uppercase tracking-wider mb-1.5">
@@ -200,11 +225,11 @@ export function CreateVaultForm() {
             </p>
           </div>
           <button
-            onClick={() => setTxDigest(null)}
+            onClick={() => router.push("/vault")}
             className="btn-primary w-full mt-6"
-            aria-label="Create another vault"
+            aria-label="Go to vault dashboard"
           >
-            Create Another Vault
+            Go to Dashboard
           </button>
         </div>
       </div>
@@ -212,18 +237,30 @@ export function CreateVaultForm() {
   }
 
   return (
+    <>
+    <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     <form
       onSubmit={handleSubmit}
       className="max-w-lg mx-auto"
     >
       <div className="glass-card p-8 space-y-6">
-        <div>
-          <h2 className="font-display font-bold text-xl text-white mb-1">
-            Create New Vault
-          </h2>
-          <p className="text-sm text-gray-500">
-            Configure policy guardrails for your AI agent.
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="font-display font-bold text-xl text-white mb-1">
+              Create New Vault
+            </h2>
+            <p className="text-sm text-gray-500">
+              Configure policy guardrails for your AI agent.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={applyRecommended}
+            className="btn-ghost text-xs shrink-0"
+            aria-label="Apply recommended vault settings"
+          >
+            Recommended
+          </button>
         </div>
 
         {/* Coin Selection */}
@@ -382,5 +419,6 @@ export function CreateVaultForm() {
         </button>
       </div>
     </form>
+    </>
   );
 }
