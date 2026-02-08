@@ -7,6 +7,7 @@ import { AgentActivityLog } from "@/components/agent/agent-activity-log";
 import { ToastContainer, useToast } from "@/components/ui/toast";
 import { StatCard } from "@/components/vault/stat-card";
 import { PolicyRow } from "@/components/vault/policy-row";
+import { BudgetBar } from "@/components/vault/budget-bar";
 import { OwnerActions } from "@/components/vault/owner-actions";
 import { DemoModePanel } from "@/components/vault/demo-mode-panel";
 import { GuardrailStressTest } from "@/components/vault/guardrail-stress-test";
@@ -144,11 +145,6 @@ export default function VaultDetailPage() {
     }
   }
 
-  const budgetSpentPct =
-    vault && vault.policy.maxBudget > 0n
-      ? Number((vault.totalSpent * 100n) / vault.policy.maxBudget)
-      : 0;
-
   return (
     <div className="min-h-screen relative">
       <Header />
@@ -222,26 +218,10 @@ export default function VaultDetailPage() {
             </div>
 
             {/* Budget usage bar */}
-            <div className="glass-card p-6 animate-fade-in-up">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-[10px] font-mono text-gray-500 uppercase tracking-wider">
-                  Budget Utilization
-                </p>
-                <span className={`text-sm font-mono font-bold ${budgetSpentPct > 80 ? "text-amber" : "text-accent"}`}>
-                  {budgetSpentPct}%
-                </span>
-              </div>
-              <div className="budget-bar">
-                <div
-                  className="budget-bar-fill"
-                  style={{ width: `${Math.min(budgetSpentPct, 100)}%` }}
-                />
-              </div>
-              <div className="flex justify-between mt-2 text-[10px] font-mono text-gray-600">
-                <span>0 SUI</span>
-                <span>{mistToSui(vault.policy.maxBudget).toFixed(2)} SUI</span>
-              </div>
-            </div>
+            <BudgetBar
+              totalSpent={vault.totalSpent}
+              maxBudget={vault.policy.maxBudget}
+            />
 
             {/* Policy Details */}
             <div className="glass-card p-6 animate-fade-in-up">
