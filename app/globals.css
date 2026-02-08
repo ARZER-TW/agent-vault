@@ -241,6 +241,114 @@ body::before {
   content: counter(num);
 }
 
+/* Floating particles - landing page hero */
+@keyframes particleFloat {
+  0%, 100% { transform: translate(0, 0); opacity: 0; }
+  10% { opacity: 0.6; }
+  90% { opacity: 0.6; }
+  50% { transform: translate(var(--dx), var(--dy)); }
+}
+
+.hero-particles {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.hero-particle {
+  position: absolute;
+  width: var(--size, 3px);
+  height: var(--size, 3px);
+  border-radius: 50%;
+  background: var(--color-accent);
+  opacity: 0;
+  animation: particleFloat var(--dur, 8s) ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+}
+
+/* Dash flow for vault rings */
+@keyframes dashFlow {
+  from { border-spacing: 0; }
+  to { border-spacing: 20px; }
+}
+
+/* Vault icon pulse glow */
+@keyframes pulseGlow {
+  0%, 100% { filter: drop-shadow(0 0 4px var(--color-accent-glow)); }
+  50% { filter: drop-shadow(0 0 16px var(--color-accent-glow-strong)); }
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 2.5s ease-in-out infinite;
+}
+
+/* Agent running border glow */
+@keyframes borderGlow {
+  0%, 100% { box-shadow: 0 0 8px var(--color-accent-glow), inset 0 0 8px var(--color-accent-glow); }
+  50% { box-shadow: 0 0 16px var(--color-amber-glow), inset 0 0 16px var(--color-amber-glow); }
+}
+
+.agent-running-glow {
+  animation: borderGlow 2s ease-in-out infinite;
+  border-color: var(--color-accent) !important;
+}
+
+/* Shield scale-in bounce */
+@keyframes scaleInBounce {
+  0% { transform: scale(0); opacity: 0; }
+  60% { transform: scale(1.2); opacity: 1; }
+  80% { transform: scale(0.95); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.animate-scale-in-bounce {
+  animation: scaleInBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* BLOCKED flash effect */
+@keyframes blockedFlash {
+  0%, 100% { background-color: rgba(239, 68, 68, 0.1); }
+  50% { background-color: rgba(239, 68, 68, 0.25); }
+}
+
+.blocked-flash {
+  animation: blockedFlash 0.6s ease-out;
+}
+
+/* Budget bar shimmer */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+.budget-bar-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.budget-bar-shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.2) 50%,
+    transparent 100%
+  );
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+/* Ring chart load animation */
+@keyframes ringLoad {
+  from { stroke-dashoffset: var(--circumference); }
+  to { stroke-dashoffset: var(--target-offset); }
+}
+
 /* ============================================================
    Component Styles
    ============================================================ */
@@ -409,7 +517,9 @@ body::before {
   width: 300px;
   height: 300px;
   border-color: var(--color-accent);
-  animation: ring-rotate 30s linear infinite;
+  animation: ring-rotate 30s linear infinite, dashFlow 8s linear infinite;
+  border-style: dashed;
+  stroke-dasharray: 8 12;
 }
 
 .vault-ring-2 {
@@ -417,14 +527,15 @@ body::before {
   height: 420px;
   border-color: var(--color-amber);
   border-style: dashed;
-  animation: ring-rotate-reverse 25s linear infinite;
+  animation: ring-rotate-reverse 25s linear infinite, dashFlow 12s linear infinite;
 }
 
 .vault-ring-3 {
   width: 540px;
   height: 540px;
   border-color: var(--color-accent);
-  animation: ring-rotate 40s linear infinite;
+  border-style: dashed;
+  animation: ring-rotate 40s linear infinite, dashFlow 10s linear infinite;
 }
 
 /* Stat card with top accent line */

@@ -200,6 +200,11 @@ export default function VaultDetailPage() {
                 value={mistToSui(vault.balance).toFixed(4)}
                 unit="SUI"
                 accent
+                ringProgress={
+                  vault.policy.maxBudget > 0n
+                    ? Number(vault.balance * 100n / vault.policy.maxBudget) / 100
+                    : 0
+                }
               />
               <StatCard
                 label="Total Spent"
@@ -210,6 +215,11 @@ export default function VaultDetailPage() {
                 label="Budget Left"
                 value={mistToSui(vault.policy.maxBudget - vault.totalSpent).toFixed(4)}
                 unit="SUI"
+                ringProgress={
+                  vault.policy.maxBudget > 0n
+                    ? Number((vault.policy.maxBudget - vault.totalSpent) * 100n / vault.policy.maxBudget) / 100
+                    : 0
+                }
               />
               <StatCard
                 label="Transactions"
@@ -282,7 +292,7 @@ export default function VaultDetailPage() {
             <StrategyInput strategy={strategy} onStrategyChange={setStrategy} />
 
             {/* Agent Controls */}
-            <div className="glass-card p-6 animate-fade-in-up">
+            <div className={`glass-card p-6 animate-fade-in-up${isRunning ? " agent-running-glow" : ""}`}>
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h2 className="text-sm font-mono font-medium text-gray-500 uppercase tracking-wider mb-2">

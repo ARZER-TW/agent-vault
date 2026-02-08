@@ -5,10 +5,10 @@ interface BudgetBarProps {
   maxBudget: bigint;
 }
 
-function getBarColor(pct: number): string {
-  if (pct >= 85) return "#ef4444";
-  if (pct >= 60) return "var(--color-amber)";
-  return "var(--color-success)";
+function getBarGradient(pct: number): string {
+  if (pct >= 85) return "linear-gradient(90deg, var(--color-amber) 0%, #ef4444 100%)";
+  if (pct >= 60) return "linear-gradient(90deg, var(--color-success) 0%, var(--color-amber) 100%)";
+  return "linear-gradient(90deg, var(--color-success) 0%, var(--color-accent) 100%)";
 }
 
 function getPctTextClass(pct: number): string {
@@ -44,10 +44,10 @@ export function BudgetBar({ totalSpent, maxBudget }: BudgetBarProps) {
         aria-label={`Budget usage: ${pct}% spent`}
       >
         <div
-          className="budget-bar-fill"
+          className="budget-bar-fill budget-bar-shimmer"
           style={{
             width: `${clampedPct}%`,
-            background: getBarColor(pct),
+            background: getBarGradient(pct),
             transition: "width 0.6s cubic-bezier(0.4, 0, 0.2, 1), background 0.4s ease",
           }}
         />

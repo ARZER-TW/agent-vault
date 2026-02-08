@@ -232,6 +232,21 @@ export function GuardrailStressTest({ vault, addToast }: GuardrailStressTestProp
               }`}
             >
               <div className="flex items-center gap-3">
+                {blockedCount === completedCount && (
+                  <svg
+                    width="36"
+                    height="36"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    className="text-emerald-400 animate-scale-in-bounce shrink-0"
+                    aria-hidden="true"
+                  >
+                    <path d="M12 2l8 4v6c0 5.5-3.8 10-8 12-4.2-2-8-6.5-8-12V6l8-4z" />
+                    <polyline points="9 12 11 14 15 10" />
+                  </svg>
+                )}
                 <span
                   className={`text-2xl font-display font-bold ${
                     blockedCount === completedCount ? "text-emerald-400" : "text-red-400"
@@ -333,7 +348,7 @@ function TestRow({
                   ? "bg-emerald-500/20 text-emerald-400"
                   : state.error
                     ? "bg-amber/20 text-amber"
-                    : "bg-red-500/20 text-red-400"
+                    : "bg-red-500/20 text-red-400 blocked-flash"
               }`}
             >
               {state.result?.blocked ? "BLOCKED" : state.error ? "ERROR" : "PASSED"}

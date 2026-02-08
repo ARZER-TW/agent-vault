@@ -1,6 +1,47 @@
 import Link from "next/link";
 import { Header } from "@/components/layout/header";
 
+function TechIcon({ icon }: { icon: string }) {
+  switch (icon) {
+    case "shield":
+      return (
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="1.5" className="mx-auto mb-3">
+          <path d="M12 2l8 4v6c0 5.5-3.8 10-8 12-4.2-2-8-6.5-8-12V6l8-4z" />
+          <polyline points="9 12 11 14 15 10" />
+        </svg>
+      );
+    case "exchange":
+      return (
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="1.5" className="mx-auto mb-3">
+          <polyline points="17 1 21 5 17 9" />
+          <path d="M3 11V9a4 4 0 014-4h14" />
+          <polyline points="7 23 3 19 7 15" />
+          <path d="M21 13v2a4 4 0 01-4 4H3" />
+        </svg>
+      );
+    case "key":
+      return (
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="1.5" className="mx-auto mb-3">
+          <circle cx="8" cy="15" r="5" />
+          <path d="M11.7 11.3L15 8l2 2" />
+          <path d="M15 8l4-4" />
+        </svg>
+      );
+    case "brain":
+      return (
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="1.5" className="mx-auto mb-3">
+          <path d="M12 2a7 7 0 00-4.6 12.3A3 3 0 006 17v1a2 2 0 002 2h8a2 2 0 002-2v-1a3 3 0 00-1.4-2.7A7 7 0 0012 2z" />
+          <path d="M9 22v-2" />
+          <path d="M15 22v-2" />
+          <path d="M9 10h6" />
+          <path d="M12 7v6" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+}
+
 function VaultIcon() {
   return (
     <svg
@@ -8,7 +49,7 @@ function VaultIcon() {
       height="48"
       viewBox="0 0 48 48"
       fill="none"
-      className="text-accent"
+      className="text-accent animate-pulse-glow"
     >
       <rect
         x="4"
@@ -75,6 +116,19 @@ export default function Home() {
       <section className="relative overflow-hidden">
         {/* Background gradient */}
         <div className="absolute inset-0 section-gradient" />
+
+        {/* Floating particles */}
+        <div className="hero-particles" aria-hidden="true">
+          <div className="hero-particle" style={{ top: "15%", left: "10%", "--dx": "40px", "--dy": "-60px", "--dur": "7s", "--delay": "0s", "--size": "3px" } as React.CSSProperties} />
+          <div className="hero-particle" style={{ top: "25%", left: "80%", "--dx": "-50px", "--dy": "30px", "--dur": "9s", "--delay": "1s", "--size": "2px" } as React.CSSProperties} />
+          <div className="hero-particle" style={{ top: "60%", left: "20%", "--dx": "30px", "--dy": "-40px", "--dur": "8s", "--delay": "2s", "--size": "4px" } as React.CSSProperties} />
+          <div className="hero-particle" style={{ top: "70%", left: "75%", "--dx": "-60px", "--dy": "-20px", "--dur": "10s", "--delay": "0.5s", "--size": "2px" } as React.CSSProperties} />
+          <div className="hero-particle" style={{ top: "40%", left: "5%", "--dx": "50px", "--dy": "50px", "--dur": "11s", "--delay": "3s", "--size": "3px" } as React.CSSProperties} />
+          <div className="hero-particle" style={{ top: "20%", left: "50%", "--dx": "-30px", "--dy": "60px", "--dur": "8.5s", "--delay": "1.5s", "--size": "2px" } as React.CSSProperties} />
+          <div className="hero-particle" style={{ top: "80%", left: "45%", "--dx": "20px", "--dy": "-70px", "--dur": "9.5s", "--delay": "4s", "--size": "3px" } as React.CSSProperties} />
+          <div className="hero-particle" style={{ top: "50%", left: "90%", "--dx": "-40px", "--dy": "40px", "--dur": "7.5s", "--delay": "2.5s", "--size": "2px" } as React.CSSProperties} />
+        </div>
+
         <div
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
           aria-hidden="true"
@@ -215,6 +269,7 @@ export default function Home() {
                 key={tech.label}
                 className="text-center p-6 rounded-xl bg-void/50 border border-vault-border hover:border-vault-border-hover transition-colors animate-fade-in-up"
               >
+                <TechIcon icon={tech.icon} />
                 <p className="font-display font-bold text-white text-lg mb-1">
                   {tech.label}
                 </p>
