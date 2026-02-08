@@ -11,6 +11,7 @@ import {
 import { getSuiClient } from "@/lib/sui/client";
 import { suiToMist, mistToSui, ACTION_SWAP } from "@/lib/constants";
 import { checkRateLimit, getClientKey } from "@/lib/rate-limiter";
+import type { VaultData, Policy } from "@/lib/vault/types";
 
 const DemoRequestSchema = z.object({
   vaultId: z.string().min(1),
@@ -18,11 +19,142 @@ const DemoRequestSchema = z.object({
   ownerAddress: z.string().min(1),
   forceAmount: z.number().positive(),
   forceAction: z.enum(["swap_sui_to_usdc", "swap_usdc_to_sui"]).default("swap_sui_to_usdc"),
+  scenario: z.enum(["normal", "over_limit", "cooldown", "budget_exceeded"]).optional(),
 });
 
+type DemoScenario = "normal" | "over_limit" | "cooldown" | "budget_exceeded";
+
 /**
- * Demo endpoint: skip Claude API, use forced amount for policy check.
- * Executes agent_withdraw to demonstrate policy enforcement on-chain.
+ * Build a synthetic vault for fully offline demo scenarios.
+ * Each scenario shapes the vault state to trigger a specific policy outcome.
+ */
+function buildScenarioVault(vaultId: string, scenario: DemoScenario): VaultData {
+  const basePolicy: Policy = {
+    maxBudget: suiToMist(10),
+    maxPerTx: suiToMist(1),
+    allowedActions: [ACTION_SWAP],
+    cooldownMs: 60_000,
+    expiresAt: Date.now() + 3_600_000,
+  };
+
+  switch (scenario) {
+    case "normal":
+      return {
+        id: vaultId,
+        owner: "0xdemo_owner",
+        balance: suiToMist(5),
+        policy: basePolicy,
+        authorizedCaps: [],
+        totalSpent: 0n,
+        lastTxTime: 0,
+        txCount: 0,
+      };
+
+    case "over_limit":
+      return {
+        id: vaultId,
+        owner: "0xdemo_owner",
+        balance: suiToMist(5),
+        policy: { ...basePolicy, maxPerTx: suiToMist(0.1) },
+        authorizedCaps: [],
+        totalSpent: 0n,
+        lastTxTime: 0,
+        txCount: 0,
+      };
+
+    case "cooldown":
+      return {
+        id: vaultId,
+        owner: "0xdemo_owner",
+        balance: suiToMist(5),
+        policy: basePolicy,
+        authorizedCaps: [],
+        totalSpent: suiToMist(1),
+        lastTxTime: Date.now() - 10_000,
+        txCount: 1,
+      };
+
+    case "budget_exceeded":
+      return {
+        id: vaultId,
+        owner: "0xdemo_owner",
+        balance: suiToMist(5),
+        policy: basePolicy,
+        authorizedCaps: [],
+        totalSpent: suiToMist(9.5),
+        lastTxTime: 0,
+        txCount: 5,
+      };
+  }
+}
+
+function buildScenarioDecision(scenario: DemoScenario, amount: number) {
+  const labels: Record<DemoScenario, string> = {
+    normal: "Normal trade within policy limits",
+    over_limit: "Trade exceeds per-transaction limit",
+    cooldown: "Trade during cooldown period",
+    budget_exceeded: "Trade exceeds remaining budget",
+  };
+
+  return {
+    action: "swap_sui_to_usdc" as const,
+    reasoning: `[Demo: ${scenario}] ${labels[scenario]}`,
+    confidence: 1.0,
+    params: { amount: String(amount) },
+  };
+}
+
+/**
+ * Handle fully offline scenario demo (no external APIs).
+ */
+function handleOfflineScenario(
+  vaultId: string,
+  scenario: DemoScenario,
+  forceAmount: number,
+) {
+  const vault = buildScenarioVault(vaultId, scenario);
+  const amountMist = suiToMist(forceAmount);
+  const decision = buildScenarioDecision(scenario, forceAmount);
+
+  const policyCheck = checkPolicy({
+    vault,
+    amount: amountMist,
+    actionType: ACTION_SWAP,
+    nowMs: Date.now(),
+  });
+
+  const blocked = !policyCheck.allowed;
+
+  return NextResponse.json({
+    success: true,
+    data: {
+      scenario,
+      blocked,
+      reason: policyCheck.reason,
+      decision,
+      policyCheck,
+      hasTransaction: false,
+      txDigest: null,
+      timestamp: Date.now(),
+      vault: {
+        id: vault.id,
+        balance: mistToSui(vault.balance),
+        totalSpent: mistToSui(vault.totalSpent),
+        txCount: vault.txCount,
+      },
+      market: {
+        midPrice: 1.5,
+        timestamp: Date.now(),
+        source: "fallback" as const,
+      },
+    },
+  });
+}
+
+/**
+ * Demo endpoint: skip LLM API, use forced amount for policy check.
+ * With `scenario` param: fully offline demo (no external APIs at all).
+ * Without `scenario`: on-chain demo using real vault + policy check + TX execution.
  */
 export async function POST(request: NextRequest) {
   const rl = checkRateLimit(getClientKey(request.headers), { limit: 20, windowMs: 60_000 });
@@ -38,10 +170,15 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const params = DemoRequestSchema.parse(body);
 
+    // Fully offline scenario mode
+    if (params.scenario) {
+      return handleOfflineScenario(params.vaultId, params.scenario, params.forceAmount);
+    }
+
+    // On-chain demo mode (original behavior)
     const vault = await getVault(params.vaultId);
     const amountMist = suiToMist(params.forceAmount);
 
-    // Build a synthetic decision
     const decision = {
       action: params.forceAction as "swap_sui_to_usdc" | "swap_usdc_to_sui",
       reasoning: `[Demo Mode] Forced ${params.forceAction} with ${params.forceAmount} SUI`,
@@ -51,7 +188,6 @@ export async function POST(request: NextRequest) {
       },
     };
 
-    // Policy check
     const policyCheck = checkPolicy({
       vault,
       amount: amountMist,
@@ -59,13 +195,14 @@ export async function POST(request: NextRequest) {
       nowMs: Date.now(),
     });
 
-    // If policy blocks, return immediately (no TX execution)
     if (!policyCheck.allowed) {
       return NextResponse.json({
         success: true,
         data: {
           decision,
           policyCheck,
+          blocked: true,
+          reason: policyCheck.reason,
           hasTransaction: false,
           txDigest: null,
           timestamp: Date.now(),
@@ -79,7 +216,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Build and execute agent_withdraw
     const transaction = buildAgentWithdraw({
       vaultId: params.vaultId,
       agentCapId: params.agentCapId,
@@ -90,7 +226,10 @@ export async function POST(request: NextRequest) {
 
     const agentKeyStr = process.env.AGENT_PRIVATE_KEY;
     if (!agentKeyStr) {
-      throw new Error("AGENT_PRIVATE_KEY is not set");
+      return NextResponse.json(
+        { success: false, error: "AGENT_PRIVATE_KEY is not set" },
+        { status: 500 },
+      );
     }
     const agentKeypair = Ed25519Keypair.fromSecretKey(agentKeyStr);
 
@@ -107,7 +246,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Wait for transaction confirmation and re-fetch vault
     const client = getSuiClient();
     await client.waitForTransaction({ digest: txDigest });
     const updatedVault = await getVault(params.vaultId);
@@ -117,6 +255,8 @@ export async function POST(request: NextRequest) {
       data: {
         decision,
         policyCheck,
+        blocked: false,
+        reason: policyCheck.reason,
         hasTransaction: true,
         txDigest,
         timestamp: Date.now(),
