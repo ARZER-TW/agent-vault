@@ -34,6 +34,7 @@ export default function VaultDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
   const [strategy, setStrategy] = useState("");
+  const [auditRefreshKey, setAuditRefreshKey] = useState(0);
 
   const canSignTx = address && ephemeralKeypair && zkProof && maxEpoch !== null;
 
@@ -132,6 +133,7 @@ export default function VaultDetailPage() {
       }
 
       if (json.data.policyCheck?.allowed && json.data.txDigest) {
+        setAuditRefreshKey((k) => k + 1);
         addToast("success", `Agent executed. TX: ${json.data.txDigest}`);
       } else if (!json.data.policyCheck?.allowed) {
         addToast("info", `Policy blocked: ${json.data.policyCheck.reason}`);
@@ -376,7 +378,7 @@ export default function VaultDetailPage() {
             </div>
 
             {/* On-Chain Audit Trail */}
-            <OnChainAudit vaultId={vaultId} />
+            <OnChainAudit vaultId={vaultId} refreshKey={auditRefreshKey} />
           </div>
         )}
       </main>

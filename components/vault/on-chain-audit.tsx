@@ -40,7 +40,7 @@ function EventRow({ event }: { event: VaultEvent }) {
   );
 }
 
-export function OnChainAudit({ vaultId }: { vaultId: string }) {
+export function OnChainAudit({ vaultId, refreshKey = 0 }: { vaultId: string; refreshKey?: number }) {
   const [events, setEvents] = useState<VaultEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -70,7 +70,7 @@ export function OnChainAudit({ vaultId }: { vaultId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [vaultId]);
+  }, [vaultId, refreshKey]);
 
   return (
     <div className="glass-card p-6 animate-fade-in-up">
