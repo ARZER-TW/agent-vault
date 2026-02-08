@@ -40,7 +40,7 @@ sui client publish --gas-budget 100000000
 | Item        | Value                                                              |
 |-------------|--------------------------------------------------------------------|
 | Network     | Sui Testnet                                                        |
-| Package ID  | `0xbf74c7a7717e74f5074d024e27a5f6d2838d5025e4c67afd758286e3ba6bb31b` |
+| Package ID  | `0xf01673d606536731ca79fe85324026cdf9c7b2471bbf61a29b03ce911fe5c7d1` |
 | Module      | `agent_vault`                                                      |
 | Edition     | 2024.beta                                                          |
 

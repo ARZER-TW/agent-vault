@@ -1,7 +1,7 @@
 // Contract addresses
 export const PACKAGE_ID =
   process.env.NEXT_PUBLIC_PACKAGE_ID ??
-  "0xbf74c7a7717e74f5074d024e27a5f6d2838d5025e4c67afd758286e3ba6bb31b";
+  "0xf01673d606536731ca79fe85324026cdf9c7b2471bbf61a29b03ce911fe5c7d1";
 
 export const MODULE_NAME = "agent_vault";
 
