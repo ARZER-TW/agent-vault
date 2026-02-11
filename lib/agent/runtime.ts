@@ -5,16 +5,29 @@ import type { OrderBookSnapshot } from "@/lib/sui/market";
 import type { AgentDecision } from "./intent-parser";
 import type { PolicyCheckResult } from "./policy-checker";
 import { getVault } from "@/lib/vault/service";
-import { getOrderBook, getSwapQuote } from "@/lib/sui/market";
+import { getOrderBook } from "@/lib/sui/market";
 import { getAgentDecision } from "./llm-client";
 import { checkPolicy } from "./policy-checker";
-import { buildAgentSwap, buildAgentWithdraw } from "@/lib/vault/ptb-builder";
-import { suiToMist, mistToSui, ACTION_SWAP, DEEPBOOK_POOL_KEY } from "@/lib/constants";
+import {
+  buildAgentCetusSwap,
+  buildAgentWithdraw,
+  buildAgentStableMint,
+  buildAgentStableBurn,
+  buildAgentStableClaim,
+} from "@/lib/vault/ptb-builder";
+import {
+  suiToMist,
+  ACTION_SWAP,
+  ACTION_STABLE_MINT,
+  ACTION_STABLE_BURN,
+  ACTION_STABLE_CLAIM,
+} from "@/lib/constants";
 import {
   executeSponsoredAgentTransaction,
   executeAgentTransaction,
 } from "@/lib/auth/sponsored-tx";
 import { getSuiClient } from "@/lib/sui/client";
+import { STABLELAYER_AVAILABLE } from "@/lib/sui/stablelayer";
 
 export interface AgentRunError {
   step: "market_data" | "llm_decision" | "policy_check" | "ptb_build" | "tx_execute";
@@ -31,11 +44,111 @@ export interface AgentRunResult {
   error?: AgentRunError;
 }
 
+/** Actions that withdraw SUI from the vault */
+const WITHDRAWAL_ACTIONS = new Set<string>([
+  "swap_sui_to_usdc",
+  "swap_usdc_to_sui",
+  "stable_mint",
+]);
+
+/** Map LLM action string to Move contract action type constant */
+function getActionType(action: string): number {
+  switch (action) {
+    case "swap_sui_to_usdc":
+    case "swap_usdc_to_sui":
+      return ACTION_SWAP;
+    case "stable_mint":
+      return ACTION_STABLE_MINT;
+    case "stable_burn":
+      return ACTION_STABLE_BURN;
+    case "stable_claim":
+      return ACTION_STABLE_CLAIM;
+    default:
+      return ACTION_SWAP;
+  }
+}
+
+/**
+ * Build the appropriate transaction based on the agent's decision.
+ * All builders are async because Cetus route finding requires network calls.
+ */
+async function buildTransaction(params: {
+  action: string;
+  vaultId: string;
+  agentCapId: string;
+  agentAddress: string;
+  ownerAddress: string;
+  amountMist?: bigint;
+}): Promise<Transaction> {
+  const { action, vaultId, agentCapId, agentAddress, ownerAddress, amountMist } = params;
+
+  switch (action) {
+    case "swap_sui_to_usdc":
+      try {
+        return await buildAgentCetusSwap({
+          vaultId,
+          agentCapId,
+          ownerAddress,
+          amountMist: amountMist!,
+        });
+      } catch (cetusError) {
+        // Fallback: simple withdraw if Cetus swap route not available
+        console.warn(
+          "[runtime] Cetus swap failed, falling back to withdraw:",
+          cetusError instanceof Error ? cetusError.message : String(cetusError),
+        );
+        return buildAgentWithdraw({
+          vaultId,
+          agentCapId,
+          amount: amountMist!,
+          actionType: ACTION_SWAP,
+          recipientAddress: ownerAddress,
+        });
+      }
+
+    case "swap_usdc_to_sui":
+      // Vault holds SUI only; reverse swap sends SUI directly to owner
+      return buildAgentWithdraw({
+        vaultId,
+        agentCapId,
+        amount: amountMist!,
+        actionType: ACTION_SWAP,
+        recipientAddress: ownerAddress,
+      });
+
+    case "stable_mint":
+      return buildAgentStableMint({
+        vaultId,
+        agentCapId,
+        agentAddress,
+        ownerAddress,
+        amountMist: amountMist!,
+      });
+
+    case "stable_burn":
+      return buildAgentStableBurn({
+        vaultId,
+        agentCapId,
+        agentAddress,
+        ownerAddress,
+      });
+
+    case "stable_claim":
+      return buildAgentStableClaim({
+        agentAddress,
+        ownerAddress,
+      });
+
+    default:
+      throw new Error(`Unknown action: ${action}`);
+  }
+}
+
 /**
  * Execute one cycle of the agent loop:
  * 1. Fetch vault state
- * 2. Get market data
- * 3. Ask Claude for decision
+ * 2. Get market data via Cetus Aggregator
+ * 3. Ask LLM for trading decision
  * 4. Validate against policy
  * 5. Build PTB if allowed
  * 6. Execute transaction on-chain
@@ -52,8 +165,8 @@ export async function runAgentCycle(params: {
   // Step 1: Fetch current vault state
   const vault = await getVault(vaultId);
 
-  // Step 2: Get market data (fallback handled inside getOrderBook)
-  const orderBook = await getOrderBook(agentAddress, DEEPBOOK_POOL_KEY);
+  // Step 2: Get market data via Cetus Aggregator
+  const orderBook = await getOrderBook(agentAddress);
 
   // Step 3: Ask LLM for trading decision (with timeout + parse fallback)
   let decision: AgentDecision;
@@ -108,25 +221,48 @@ export async function runAgentCycle(params: {
     };
   }
 
-  // Step 5: Parse amount and check policy
-  const amountSui = parseFloat(decision.params?.amount ?? "0");
-  if (amountSui <= 0) {
+  // Step 4c: Stablelayer availability check
+  if (decision.action.startsWith("stable_") && !STABLELAYER_AVAILABLE) {
     return {
-      decision,
-      policyCheck: { allowed: true, reason: "No amount specified - treating as hold" },
+      decision: {
+        ...decision,
+        action: "hold" as const,
+        reasoning: `Stablelayer is mainnet-only (current network unavailable). Original: ${decision.reasoning}`,
+      },
+      policyCheck: { allowed: true, reason: "Stablelayer unavailable on current network" },
       transaction: null,
       txDigest: null,
       vault,
       orderBook,
     };
   }
-  const amountMist = suiToMist(amountSui);
 
+  // Step 5: Determine action type and whether withdrawal is needed
+  const actionType = getActionType(decision.action);
+  const requiresWithdrawal = WITHDRAWAL_ACTIONS.has(decision.action);
+
+  let amountMist: bigint | undefined;
+  if (requiresWithdrawal) {
+    const amountSui = parseFloat(decision.params?.amount ?? "0");
+    if (amountSui <= 0) {
+      return {
+        decision,
+        policyCheck: { allowed: true, reason: "No amount specified - treating as hold" },
+        transaction: null,
+        txDigest: null,
+        vault,
+        orderBook,
+      };
+    }
+    amountMist = suiToMist(amountSui);
+  }
+
+  // Step 5b: Check policy (amount is optional for non-withdrawal actions)
   const policyCheck = checkPolicy({
     vault,
-    amount: amountMist,
-    actionType: ACTION_SWAP,
+    actionType,
     nowMs: Date.now(),
+    amount: amountMist,
   });
 
   if (!policyCheck.allowed) {
@@ -141,87 +277,28 @@ export async function runAgentCycle(params: {
   }
 
   // Step 6: Build transaction
-  const minOutRaw = decision.params?.minOut
-    ? parseFloat(decision.params.minOut)
-    : 0;
-  // minOut for DeepBook is in quote asset units (DBUSDC, 6 decimals)
-  const minOut = Math.floor(minOutRaw * 1e6);
-
   let transaction: Transaction;
-
-  if (decision.action === "swap_sui_to_usdc") {
-    // Get exact DEEP fee requirement from DeepBook, with 50% buffer
-    let deepAmount = 0;
-    try {
-      const quote = await getSwapQuote(agentAddress, amountSui, DEEPBOOK_POOL_KEY);
-      deepAmount = quote.deepRequired > 0 ? quote.deepRequired * 1.5 : 0;
-    } catch {
-      // If quote fails, use estimated fee (taker fee 0.1%, ~0.04 DEEP per SUI)
-      deepAmount = amountSui * 0.04;
-    }
-
-    try {
-      transaction = buildAgentSwap({
-        vaultId,
-        agentCapId,
-        agentAddress,
-        ownerAddress,
-        amountMist,
-        minOut,
-        deepAmount,
-        poolKey: DEEPBOOK_POOL_KEY,
-      });
-    } catch {
-      // Fallback: simple withdraw if DeepBook swap build fails
-      try {
-        console.warn("[runtime] Swap PTB build failed, falling back to withdraw");
-        transaction = buildAgentWithdraw({
-          vaultId,
-          agentCapId,
-          amount: amountMist,
-          actionType: ACTION_SWAP,
-          recipientAddress: ownerAddress,
-        });
-      } catch (withdrawBuildError) {
-        const errorMsg = withdrawBuildError instanceof Error
-          ? withdrawBuildError.message
-          : String(withdrawBuildError);
-        console.warn("[runtime] PTB build failed entirely:", errorMsg);
-        return {
-          decision,
-          policyCheck,
-          transaction: null,
-          txDigest: null,
-          vault,
-          orderBook,
-          error: { step: "ptb_build", error: errorMsg },
-        };
-      }
-    }
-  } else {
-    // swap_usdc_to_sui - use simple withdraw
-    // (reverse swap via DeepBook would need swapExactQuoteForBase)
-    try {
-      transaction = buildAgentWithdraw({
-        vaultId,
-        agentCapId,
-        amount: amountMist,
-        actionType: ACTION_SWAP,
-        recipientAddress: ownerAddress,
-      });
-    } catch (buildError) {
-      const errorMsg = buildError instanceof Error ? buildError.message : String(buildError);
-      console.warn("[runtime] PTB build failed for reverse swap:", errorMsg);
-      return {
-        decision,
-        policyCheck,
-        transaction: null,
-        txDigest: null,
-        vault,
-        orderBook,
-        error: { step: "ptb_build", error: errorMsg },
-      };
-    }
+  try {
+    transaction = await buildTransaction({
+      action: decision.action,
+      vaultId,
+      agentCapId,
+      agentAddress,
+      ownerAddress,
+      amountMist,
+    });
+  } catch (buildError) {
+    const errorMsg = buildError instanceof Error ? buildError.message : String(buildError);
+    console.warn("[runtime] PTB build failed:", errorMsg);
+    return {
+      decision,
+      policyCheck,
+      transaction: null,
+      txDigest: null,
+      vault,
+      orderBook,
+      error: { step: "ptb_build", error: errorMsg },
+    };
   }
 
   // Step 7: Execute transaction on-chain
@@ -248,7 +325,6 @@ export async function runAgentCycle(params: {
     });
   } catch (sponsoredError) {
     // Fallback: agent pays own gas
-    // Reset sender/gasOwner since sponsored path may have mutated the TX
     const agentAddr = agentKeypair.getPublicKey().toSuiAddress();
     transaction.setSender(agentAddr);
     transaction.setGasOwner(agentAddr);

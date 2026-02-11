@@ -3,7 +3,8 @@ import OpenAI from "openai";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { VaultData } from "@/lib/vault/types";
 import type { OrderBookSnapshot } from "@/lib/sui/market";
-import { mistToSui } from "@/lib/constants";
+import { mistToSui, ACTION_LABELS } from "@/lib/constants";
+import { STABLELAYER_AVAILABLE } from "@/lib/sui/stablelayer";
 import { parseAgentDecision, type AgentDecision } from "./intent-parser";
 
 type LLMProvider = "anthropic" | "openai" | "gemini";
@@ -31,23 +32,34 @@ Your job is to analyze market conditions and make trading decisions within your 
 
 You MUST respond with ONLY a JSON object (no markdown, no explanation outside JSON):
 {
-  "action": "swap_sui_to_usdc" | "swap_usdc_to_sui" | "hold",
+  "action": "swap_sui_to_usdc" | "swap_usdc_to_sui" | "stable_mint" | "stable_burn" | "stable_claim" | "hold",
   "reasoning": "Brief explanation of your decision",
   "confidence": 0.0 to 1.0,
   "params": {
-    "amount": "amount in SUI as string (e.g. '0.5')",
+    "amount": "amount in SUI as string (e.g. '0.5') - required for swap and stable_mint actions",
     "minOut": "minimum output amount as string (optional)"
   }
 }
 
+Available Actions:
+- "swap_sui_to_usdc": Withdraw SUI from vault, swap to USDC via Cetus DEX Aggregator, send USDC to owner
+- "swap_usdc_to_sui": Withdraw SUI from vault, send directly to owner
+- "stable_mint": Withdraw SUI from vault, swap to USDC via Cetus, then mint LakeUSDC stablecoin via Stablelayer for yield
+- "stable_burn": Burn owner's LakeUSDC stablecoins back to USDC (no vault withdrawal, set amount to "0")
+- "stable_claim": Claim accrued yield from Stablelayer position (no vault withdrawal, set amount to "0")
+- "hold": Do nothing this cycle
+
 Rules:
-- Only use "swap_sui_to_usdc" or "swap_usdc_to_sui" if you see a clear opportunity
+- Only execute trades when you see a clear opportunity
 - Use "hold" if market conditions are unclear or unfavorable
 - Never exceed the vault's remaining budget or per-tx limit
 - Position sizing: never trade more than 30% of the remaining budget in a single transaction
 - Consider the cooldown period between transactions
 - Set confidence below 0.5 only when you want to signal "hold" (the system auto-holds below 50%)
-- Be conservative with amounts - start small`;
+- Be conservative with amounts - start small
+- stable_mint is useful when you want to earn yield on USDC via Stablelayer's yield protocol
+- Only use stable_burn/stable_claim when the owner has existing Stablelayer positions
+- IMPORTANT: Only use actions that are listed in the Allowed Actions for this vault`;
 
 function buildSystemPrompt(strategy?: string): string {
   if (!strategy || strategy.trim().length === 0) {
@@ -72,6 +84,10 @@ function buildUserPrompt(params: {
   const maxPositionSize = mistToSui(remainingBudget) * 0.3;
   const effectiveMax = Math.min(maxPositionSize, mistToSui(vault.policy.maxPerTx));
 
+  const allowedActionLabels = vault.policy.allowedActions
+    .map((a) => ACTION_LABELS[a] ?? `Action ${a}`)
+    .join(", ");
+
   return `Current Vault State:
 - Balance: ${mistToSui(vault.balance)} SUI
 - Remaining Budget: ${mistToSui(remainingBudget)} SUI (of ${mistToSui(vault.policy.maxBudget)} total)
@@ -79,13 +95,14 @@ function buildUserPrompt(params: {
 - Suggested Max Trade: ${effectiveMax.toFixed(4)} SUI (30% of remaining budget or per-tx limit, whichever is smaller)
 - Total Transactions: ${vault.txCount}
 - Policy Expires: ${new Date(vault.policy.expiresAt).toISOString()}
+- Allowed Actions: ${allowedActionLabels}
 
-Market Data (SUI/DBUSDC):
+Market Data (SUI/USDC via Cetus Aggregator):
 - Mid Price: ${orderBook.midPrice}
 - Best Bid: ${orderBook.bidPrices[0] ?? "N/A"} (qty: ${orderBook.bidQuantities[0] ?? "N/A"})
 - Best Ask: ${orderBook.askPrices[0] ?? "N/A"} (qty: ${orderBook.askQuantities[0] ?? "N/A"})
-- Bid Depth (top 5): ${orderBook.bidPrices.slice(0, 5).map((p, i) => `${p}@${orderBook.bidQuantities[i]}`).join(", ")}
-- Ask Depth (top 5): ${orderBook.askPrices.slice(0, 5).map((p, i) => `${p}@${orderBook.askQuantities[i]}`).join(", ")}
+- Data Source: ${orderBook.source}
+${STABLELAYER_AVAILABLE ? "- Stablelayer: Available (LakeUSDC yield protocol)" : "- Stablelayer: Not available on current network"}
 
 What trading action should I take? If confidence is below 50%, choose "hold".`;
 }

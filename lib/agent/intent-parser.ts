@@ -4,7 +4,14 @@ import { z } from "zod";
  * Schema for Claude's trading decision response.
  */
 export const AgentDecisionSchema = z.object({
-  action: z.enum(["swap_sui_to_usdc", "swap_usdc_to_sui", "hold"]),
+  action: z.enum([
+    "swap_sui_to_usdc",
+    "swap_usdc_to_sui",
+    "stable_mint",
+    "stable_burn",
+    "stable_claim",
+    "hold",
+  ]),
   reasoning: z.string().min(1),
   confidence: z.number().min(0).max(1),
   params: z
