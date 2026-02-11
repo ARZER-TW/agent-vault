@@ -5,7 +5,14 @@ import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/lib/store/auth-store";
 import { buildCreateVault } from "@/lib/vault/ptb-builder";
 import { executeDirectZkLoginTransaction } from "@/lib/auth/sponsored-tx";
-import { suiToMist, mistToSui } from "@/lib/constants";
+import {
+  suiToMist,
+  mistToSui,
+  ACTION_SWAP,
+  ACTION_STABLE_MINT,
+  ACTION_STABLE_BURN,
+  ACTION_STABLE_CLAIM,
+} from "@/lib/constants";
 import { getSuiCoins, type CoinItem } from "@/lib/sui/coins";
 import { useToast, ToastContainer } from "@/components/ui/toast";
 
@@ -16,6 +23,9 @@ interface FormData {
   cooldownSeconds: string;
   expiresInHours: string;
   allowSwap: boolean;
+  allowStableMint: boolean;
+  allowStableBurn: boolean;
+  allowStableClaim: boolean;
   selectedCoinId: string;
 }
 
@@ -58,6 +68,9 @@ export function CreateVaultForm() {
     cooldownSeconds: "60",
     expiresInHours: "24",
     allowSwap: true,
+    allowStableMint: true,
+    allowStableBurn: true,
+    allowStableClaim: true,
     selectedCoinId: "",
   });
 
@@ -122,6 +135,9 @@ export function CreateVaultForm() {
       cooldownSeconds: "60",
       expiresInHours: "24",
       allowSwap: true,
+      allowStableMint: true,
+      allowStableBurn: true,
+      allowStableClaim: true,
     }));
     addToast("info", "Recommended settings applied.");
   }
@@ -140,7 +156,11 @@ export function CreateVaultForm() {
     try {
       setIsSubmitting(true);
 
-      const allowedActions = form.allowSwap ? [0] : [];
+      const allowedActions: number[] = [];
+      if (form.allowSwap) allowedActions.push(ACTION_SWAP);
+      if (form.allowStableMint) allowedActions.push(ACTION_STABLE_MINT);
+      if (form.allowStableBurn) allowedActions.push(ACTION_STABLE_BURN);
+      if (form.allowStableClaim) allowedActions.push(ACTION_STABLE_CLAIM);
       const cooldownMs = BigInt(Number(form.cooldownSeconds) * 1000);
       const expiresAt = BigInt(
         Date.now() + Number(form.expiresInHours) * 3600 * 1000,
@@ -376,31 +396,40 @@ export function CreateVaultForm() {
           <p className="text-[10px] font-mono text-gray-500 uppercase tracking-wider mb-3">
             Allowed Actions
           </p>
-          <label className="flex items-center gap-3 cursor-pointer group">
-            <div className="relative">
-              <input
-                type="checkbox"
-                checked={form.allowSwap}
-                onChange={(e) => updateField("allowSwap", e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-5 h-5 rounded-md border border-vault-border bg-void peer-checked:bg-accent/20 peer-checked:border-accent/50 transition-all flex items-center justify-center">
-                {form.allowSwap && (
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" className="text-accent">
-                    <polyline points="10 3 4.5 8.5 2 6" />
-                  </svg>
-                )}
-              </div>
-            </div>
-            <div>
-              <p className="text-sm text-gray-300 group-hover:text-white transition-colors">
-                DeepBook Swap
-              </p>
-              <p className="text-[11px] text-gray-600">
-                Allow the agent to execute token swaps
-              </p>
-            </div>
-          </label>
+          <div className="space-y-3">
+            {([
+              { field: "allowSwap" as const, label: "Cetus Swap", desc: "Swap SUI/USDC via Cetus DEX Aggregator" },
+              { field: "allowStableMint" as const, label: "Stable Mint", desc: "Mint stablecoins via Stablelayer" },
+              { field: "allowStableBurn" as const, label: "Stable Burn", desc: "Burn stablecoins back to USDC" },
+              { field: "allowStableClaim" as const, label: "Stable Claim", desc: "Claim yield from Stablelayer" },
+            ]).map(({ field, label, desc }) => (
+              <label key={field} className="flex items-center gap-3 cursor-pointer group">
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={form[field]}
+                    onChange={(e) => updateField(field, e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-5 h-5 rounded-md border border-vault-border bg-void peer-checked:bg-accent/20 peer-checked:border-accent/50 transition-all flex items-center justify-center">
+                    {form[field] && (
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" className="text-accent">
+                        <polyline points="10 3 4.5 8.5 2 6" />
+                      </svg>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-300 group-hover:text-white transition-colors">
+                    {label}
+                  </p>
+                  <p className="text-[11px] text-gray-600">
+                    {desc}
+                  </p>
+                </div>
+              </label>
+            ))}
+          </div>
         </div>
 
         <button

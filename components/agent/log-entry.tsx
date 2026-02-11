@@ -25,10 +25,14 @@ function getStatusConfig(result: AgentLogEntry) {
     };
   }
 
-  const actionLabel =
-    decision.action === "swap_sui_to_usdc"
-      ? "SWAP SUI > USDC"
-      : "SWAP USDC > SUI";
+  const ACTION_DISPLAY: Record<string, string> = {
+    swap_sui_to_usdc: "SWAP SUI > USDC",
+    swap_usdc_to_sui: "SWAP USDC > SUI",
+    stable_mint: "STABLE MINT",
+    stable_burn: "STABLE BURN",
+    stable_claim: "STABLE CLAIM",
+  };
+  const actionLabel = ACTION_DISPLAY[decision.action] ?? decision.action.toUpperCase();
 
   if (!policyCheck.allowed) {
     return {

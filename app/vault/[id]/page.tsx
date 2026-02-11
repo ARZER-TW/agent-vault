@@ -17,7 +17,7 @@ import { OnChainAudit } from "@/components/vault/on-chain-audit";
 import { useAuthStore } from "@/lib/store/auth-store";
 import { useVaultStore } from "@/lib/store/vault-store";
 import { getVault, getAgentCaps, getOwnerCaps } from "@/lib/vault/service";
-import { mistToSui } from "@/lib/constants";
+import { mistToSui, ACTION_LABELS } from "@/lib/constants";
 import type { VaultData, AgentCapData, OwnerCapData, VaultApiFields } from "@/lib/vault/types";
 
 export default function VaultDetailPage() {
@@ -261,7 +261,7 @@ export default function VaultDetailPage() {
                 <PolicyRow
                   label="Allowed Actions"
                   value={vault.policy.allowedActions.length > 0
-                    ? vault.policy.allowedActions.map((a) => a === 0 ? "Swap" : `Action ${a}`).join(", ")
+                    ? vault.policy.allowedActions.map((a) => ACTION_LABELS[a] ?? `Action ${a}`).join(", ")
                     : "None"}
                 />
                 <PolicyRow
