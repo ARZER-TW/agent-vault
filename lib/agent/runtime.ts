@@ -6,7 +6,7 @@ import type { AgentDecision } from "./intent-parser";
 import type { PolicyCheckResult } from "./policy-checker";
 import { getVault } from "@/lib/vault/service";
 import { getOrderBook, getSwapQuote } from "@/lib/sui/market";
-import { getAgentDecision } from "./claude-client";
+import { getAgentDecision } from "./llm-client";
 import { checkPolicy } from "./policy-checker";
 import { buildAgentSwap, buildAgentWithdraw } from "@/lib/vault/ptb-builder";
 import { suiToMist, mistToSui, ACTION_SWAP, DEEPBOOK_POOL_KEY } from "@/lib/constants";

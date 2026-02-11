@@ -216,6 +216,62 @@ app/ (pages + API routes)
 7. **Multi-LLM support** -- Auto-detects provider from API keys; supports OpenAI, Gemini, Anthropic
 8. **Sponsored TX with fallback** -- Tries sponsored execution first, falls back to agent-paid gas
 
+### Sponsored TX Fallback Flow
+
+Agent transactions use a dual-execution strategy defined in `lib/auth/sponsored-tx.ts` and orchestrated by `lib/agent/runtime.ts`:
+
+```
+Agent wants to execute a trade
+  |
+  v
+executeSponsoredAgentTransaction()
+  - transaction.setSender(agentAddress)
+  - transaction.setGasOwner(sponsorAddress)
+  - Build TX bytes
+  - agentKeypair.signTransaction(txBytes)    -- Agent signs the action
+  - sponsorKeypair.signTransaction(txBytes)  -- Sponsor signs for gas
+  - executeTransactionBlock([agentSig, sponsorSig])
+  |
+  +-- Success? --> return txDigest
+  |
+  +-- Failure? --> Fallback path:
+        |
+        v
+      Reset TX: setSender(agentAddress), setGasOwner(agentAddress)
+        |
+        v
+      executeAgentTransaction()
+        - signAndExecuteTransaction(agentKeypair)  -- Agent pays own gas
+        |
+        +-- Success? --> return txDigest
+        +-- Failure? --> Return error with both error messages
+```
+
+**Why the reset is needed:** The sponsored path mutates the Transaction object by setting `gasOwner` to the sponsor address. If that path fails, the TX still has the sponsor as gas owner. The fallback must explicitly reset both `sender` and `gasOwner` to the agent's address before retrying.
+
+**Three TX execution modes in the codebase:**
+
+| Function | Signer | Gas Payer | Use Case |
+|----------|--------|-----------|----------|
+| `executeSponsoredAgentTransaction` | Agent keypair | Sponsor keypair | Default agent trades |
+| `executeAgentTransaction` | Agent keypair | Agent keypair | Fallback when sponsor fails |
+| `executeDirectZkLoginTransaction` | Ephemeral key + zkLogin | User (zkLogin address) | Owner operations (deposit, withdraw, create vault) |
+
+### State Management Lifecycle
+
+The app uses two Zustand stores with different persistence characteristics:
+
+| Store | Persistence | Lost When | Contains |
+|-------|------------|-----------|----------|
+| `useAuthStore` | Backed by `sessionStorage` via `zklogin.ts` | Browser tab closes | zkLogin address, ephemeral keypair, ZK proof, maxEpoch |
+| `useVaultStore` | In-memory only (no persistence) | Page refresh or tab close | Vault list, agent logs, selected vault |
+
+**Implications for developers:**
+- `useAuthStore` data survives page refresh (restored from `sessionStorage` in `layout.tsx`)
+- `useAuthStore` data is lost when the tab closes (new tab = must re-login via Google)
+- `useVaultStore.agentLogs` accumulates during a session but resets on refresh -- this is intentional (on-chain audit trail provides permanent history)
+- Vault data in `useVaultStore` is always re-fetched from chain on page load, never cached across sessions
+
 ---
 
 ## Testing
@@ -369,7 +425,7 @@ Tests cover all contract functions and all 9 error code trigger conditions:
 
 ### Adding a New LLM Provider
 
-1. Add API key detection in `lib/agent/claude-client.ts` (`detectProvider`)
+1. Add API key detection in `lib/agent/llm-client.ts` (`detectProvider`)
 2. Implement `callNewProvider()` function following existing pattern
 3. Add provider to `MODELS` and `PROVIDER_CALLERS` maps
 4. Update `.env.example` with new key variable

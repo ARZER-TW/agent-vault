@@ -48,7 +48,7 @@ components/             # React 組件
 
 lib/                    # 核心邏輯
   agent/                # AI Agent 相關
-    claude-client.ts    # Claude API 整合
+    llm-client.ts       # Multi-LLM 整合 (OpenAI/Gemini/Anthropic)
     intent-parser.ts    # Zod 驗證 AI 回應
     policy-checker.ts   # 離線 Policy 預檢
     runtime.ts          # Agent 循環協調器
