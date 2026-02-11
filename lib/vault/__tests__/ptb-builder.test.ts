@@ -1,18 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { getDeepBookClient } from "@/lib/sui/deepbook";
-
-// Mock the DeepBook client before importing ptb-builder
-vi.mock("@/lib/sui/deepbook", () => ({
-  getDeepBookClient: vi.fn(() => ({
-    deepBook: {
-      swapExactBaseForQuote: vi.fn(() => (tx: unknown) => [
-        "baseCoinResult",
-        "quoteCoinResult",
-        "deepCoinResult",
-      ]),
-    },
-  })),
-}));
+import { describe, it, expect } from "vitest";
 
 import {
   buildCreateVault,
@@ -21,12 +7,9 @@ import {
   buildCreateAgentCap,
   buildRevokeAgentCap,
   buildAgentWithdraw,
-  buildAgentSwap,
 } from "../ptb-builder";
 
 // Valid Sui addresses for testing (64 hex chars after 0x)
-const ADDR_OWNER =
-  "0x0000000000000000000000000000000000000000000000000000000000000001";
 const ADDR_AGENT =
   "0x0000000000000000000000000000000000000000000000000000000000000002";
 const ADDR_RECIPIENT =
@@ -72,6 +55,20 @@ describe("buildCreateVault", () => {
       allowedActions: [],
       cooldownMs: 0n,
       expiresAt: 0n,
+      useGasCoin: true,
+    });
+
+    expect(tx).toBeDefined();
+  });
+
+  it("handles multiple allowedActions", () => {
+    const tx = buildCreateVault({
+      depositAmount: 1_000_000_000n,
+      maxBudget: 5_000_000_000n,
+      maxPerTx: 500_000_000n,
+      allowedActions: [0, 1, 2, 3],
+      cooldownMs: 60_000n,
+      expiresAt: BigInt(Date.now() + 3_600_000),
       useGasCoin: true,
     });
 
@@ -181,55 +178,6 @@ describe("buildAgentWithdraw", () => {
       amount: 100_000_000n,
       actionType: 1,
       recipientAddress: ADDR_RECIPIENT,
-    });
-
-    expect(tx).toBeDefined();
-  });
-});
-
-describe("buildAgentSwap", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("returns a Transaction for valid swap params", () => {
-    const tx = buildAgentSwap({
-      vaultId: "0xvault1",
-      agentCapId: "0xcap1",
-      agentAddress: ADDR_AGENT,
-      ownerAddress: ADDR_OWNER,
-      amountMist: 500_000_000n,
-      minOut: 1,
-      deepAmount: 100,
-    });
-
-    expect(tx).toBeDefined();
-  });
-
-  it("calls getDeepBookClient with agent address", () => {
-    buildAgentSwap({
-      vaultId: "0xvault1",
-      agentCapId: "0xcap1",
-      agentAddress: ADDR_AGENT,
-      ownerAddress: ADDR_OWNER,
-      amountMist: 1_000_000_000n,
-      minOut: 0,
-      deepAmount: 50,
-    });
-
-    expect(getDeepBookClient).toHaveBeenCalledWith(ADDR_AGENT);
-  });
-
-  it("accepts custom poolKey", () => {
-    const tx = buildAgentSwap({
-      vaultId: "0xvault1",
-      agentCapId: "0xcap1",
-      agentAddress: ADDR_AGENT,
-      ownerAddress: ADDR_OWNER,
-      amountMist: 200_000_000n,
-      minOut: 0,
-      deepAmount: 10,
-      poolKey: "CUSTOM_POOL",
     });
 
     expect(tx).toBeDefined();

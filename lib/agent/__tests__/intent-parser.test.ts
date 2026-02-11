@@ -151,6 +151,40 @@ describe("parseAgentDecision", () => {
     expect(result.action).toBe("swap_sui_to_usdc");
   });
 
+  it("parses stable_mint action", () => {
+    const input = JSON.stringify({
+      action: "stable_mint",
+      reasoning: "Good yield opportunity",
+      confidence: 0.75,
+      params: { amount: "1.0" },
+    });
+
+    const result = parseAgentDecision(input);
+    expect(result.action).toBe("stable_mint");
+  });
+
+  it("parses stable_burn action", () => {
+    const input = JSON.stringify({
+      action: "stable_burn",
+      reasoning: "Exit yield position",
+      confidence: 0.8,
+    });
+
+    const result = parseAgentDecision(input);
+    expect(result.action).toBe("stable_burn");
+  });
+
+  it("parses stable_claim action", () => {
+    const input = JSON.stringify({
+      action: "stable_claim",
+      reasoning: "Claim accrued yield",
+      confidence: 0.9,
+    });
+
+    const result = parseAgentDecision(input);
+    expect(result.action).toBe("stable_claim");
+  });
+
   it("takes first code block when multiple exist", () => {
     const input = `Here is my analysis:
 \`\`\`json

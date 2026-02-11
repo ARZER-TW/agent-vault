@@ -8,13 +8,13 @@ import { getVault } from "@/lib/vault/service";
 import { getOrderBook } from "@/lib/sui/market";
 import { getAgentDecision } from "./llm-client";
 import { checkPolicy } from "./policy-checker";
+import { buildAgentWithdraw } from "@/lib/vault/ptb-builder";
 import {
   buildAgentCetusSwap,
-  buildAgentWithdraw,
   buildAgentStableMint,
   buildAgentStableBurn,
   buildAgentStableClaim,
-} from "@/lib/vault/ptb-builder";
+} from "@/lib/vault/ptb-agent";
 import {
   suiToMist,
   ACTION_SWAP,

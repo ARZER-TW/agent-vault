@@ -1,10 +1,14 @@
+/**
+ * Browser-safe PTB builders for owner and basic agent operations.
+ * These can be safely imported from client-side components ("use client").
+ *
+ * For Cetus/Stablelayer agent operations (server-only), see ptb-agent.ts.
+ */
 import { Transaction } from "@mysten/sui/transactions";
-import { getDeepBookClient } from "@/lib/sui/deepbook";
 import {
   PACKAGE_ID,
   MODULE_NAME,
   CLOCK_OBJECT_ID,
-  ACTION_SWAP,
 } from "@/lib/constants";
 
 // ============================================================
@@ -145,7 +149,7 @@ export function buildRevokeAgentCap(params: {
 }
 
 // ============================================================
-// Agent Operations
+// Agent Operations (browser-safe, no external SDK deps)
 // ============================================================
 
 /**
@@ -172,71 +176,6 @@ export function buildAgentWithdraw(params: {
   });
 
   tx.transferObjects([coin], params.recipientAddress);
-
-  return tx;
-}
-
-/**
- * Build PTB for agent swap: agent_withdraw -> DeepBook swap.
- * This is the core atomic operation for the AI agent.
- *
- * Flow in a single PTB:
- * 1. agent_withdraw from Vault -> get Coin<SUI>
- * 2. Pass Coin<SUI> as baseCoin to DeepBook swapExactBaseForQuote
- * 3. Transfer swap results to the vault owner
- */
-export function buildAgentSwap(params: {
-  vaultId: string;
-  agentCapId: string;
-  agentAddress: string;
-  ownerAddress: string;
-  amountMist: bigint;
-  minOut: number;
-  deepAmount: number;
-  poolKey?: string;
-}): Transaction {
-  const {
-    vaultId,
-    agentCapId,
-    agentAddress,
-    ownerAddress,
-    amountMist,
-    minOut,
-    deepAmount,
-    poolKey = "SUI_DBUSDC",
-  } = params;
-
-  const tx = new Transaction();
-  const dbClient = getDeepBookClient(agentAddress);
-
-  // Step 1: agent_withdraw from Vault
-  const withdrawnCoin = tx.moveCall({
-    target: `${PACKAGE_ID}::${MODULE_NAME}::agent_withdraw`,
-    arguments: [
-      tx.object(vaultId),
-      tx.object(agentCapId),
-      tx.pure.u64(amountMist),
-      tx.pure.u8(ACTION_SWAP),
-      tx.object(CLOCK_OBJECT_ID),
-    ],
-  });
-
-  // Step 2: DeepBook swap (passing withdrawn coin as baseCoin)
-  // amount is ignored when baseCoin is provided; SDK uses the coin directly
-  const [baseCoinResult, quoteCoinResult, deepCoinResult] =
-    dbClient.deepBook.swapExactBaseForQuote({
-      poolKey,
-      amount: 0, // ignored when baseCoin is provided
-      deepAmount,
-      minOut,
-      baseCoin: withdrawnCoin,
-    })(tx);
-
-  // Step 3: Transfer results to vault owner
-  tx.transferObjects(
-    [baseCoinResult, quoteCoinResult, deepCoinResult],
-    ownerAddress,
-  );
 
   return tx;
 }

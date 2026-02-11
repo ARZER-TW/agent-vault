@@ -171,4 +171,75 @@ describe("checkPolicy", () => {
     expect(result.allowed).toBe(false);
     expect(result.reason).toContain("Insufficient");
   });
+
+  it("allows non-withdrawal action (no amount) when action is whitelisted", () => {
+    const vault = makeVault({
+      policy: {
+        ...makeVault().policy,
+        allowedActions: [0, 2, 3], // swap, stable_burn, stable_claim
+      },
+    });
+
+    const result = checkPolicy({
+      vault,
+      actionType: 2, // stable_burn
+      nowMs: Date.now(),
+    });
+
+    expect(result.allowed).toBe(true);
+    expect(result.reason).toBe("Policy check passed");
+  });
+
+  it("rejects non-withdrawal action when action type is not whitelisted", () => {
+    const vault = makeVault(); // only action 0 allowed
+
+    const result = checkPolicy({
+      vault,
+      actionType: 3, // stable_claim not in allowed list
+      nowMs: Date.now(),
+    });
+
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toContain("not whitelisted");
+  });
+
+  it("still checks cooldown for non-withdrawal actions", () => {
+    const now = Date.now();
+    const vault = makeVault({
+      policy: {
+        ...makeVault().policy,
+        allowedActions: [0, 3],
+      },
+      txCount: 1,
+      lastTxTime: now - 10_000, // 10s ago (< 60s cooldown)
+    });
+
+    const result = checkPolicy({
+      vault,
+      actionType: 3,
+      nowMs: now,
+    });
+
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toContain("Cooldown");
+  });
+
+  it("still checks expiry for non-withdrawal actions", () => {
+    const vault = makeVault({
+      policy: {
+        ...makeVault().policy,
+        allowedActions: [0, 2],
+        expiresAt: Date.now() - 1000,
+      },
+    });
+
+    const result = checkPolicy({
+      vault,
+      actionType: 2,
+      nowMs: Date.now(),
+    });
+
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toContain("expired");
+  });
 });
