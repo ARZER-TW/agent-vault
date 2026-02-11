@@ -2,7 +2,7 @@
 
 > 部署程序、常見問題修復、維運指南
 
-**Last Updated:** 2026-02-09
+**Last Updated:** 2026-02-11
 
 ---
 
@@ -117,11 +117,7 @@ The agent wallet executes AI-driven trades.
 
 **Required holdings:**
 - Small amount of SUI (gas; usually covered by sponsor)
-- Small amount of DEEP token (DeepBook V3 trading fees)
-
-**Get DEEP tokens on Testnet:**
-- Swap using DEEP/SUI whitelisted pool (0% fee)
-- Or use DEEP testnet faucet (if available)
+- No additional tokens required (Cetus Aggregator does not require a separate fee token)
 
 **Check agent address from running app:**
 ```bash
@@ -176,25 +172,36 @@ sui client objects --address <AGENT_ADDRESS>
 2. Confirm `NEXT_PUBLIC_PACKAGE_ID` matches the package used to create the vault
 3. Verify object ID exists on [Sui Explorer](https://suiscan.xyz/testnet)
 
-### Issue: DeepBook Swap Fails
+### Issue: Cetus Swap Fails
 
-**Symptoms:** Agent swap transaction fails on-chain
+**Symptoms:** Agent swap transaction fails on-chain or "no swap route found" error
 
 **Possible causes:**
-1. Insufficient DEEP tokens (trading fee)
-2. `minOut` set too high (slippage protection triggered)
-3. Pool has insufficient liquidity
-4. Coin object already consumed (gas coin conflict)
+1. Slippage tolerance too tight (price moved during execution)
+2. Insufficient liquidity across Cetus-aggregated DEXes
+3. Amount too small for any available route
+4. Network congestion or Cetus API timeout
 
 **Fix:**
-1. Verify Agent address holds DEEP tokens:
-   ```bash
-   sui client objects --address <AGENT_ADDRESS>
-   ```
-2. Lower `minOut` value (or set to 0 for testing)
-3. Place counterparty orders on DeepBook to add liquidity
-4. Ensure PTB does not reuse the same coin object
-5. Run diagnostics: `npx tsx scripts/test-deepbook.ts`
+1. Check agent logs for specific Cetus error messages
+2. Increase slippage tolerance (default: 1%, configurable in `ptb-agent.ts`)
+3. Try a different amount (larger amounts may find better routes)
+4. Verify Cetus Aggregator API is operational
+5. The runtime automatically falls back to simple `agent_withdraw` if Cetus routing fails
+
+### Issue: Stablelayer Operation Fails
+
+**Symptoms:** Stable mint/burn/claim transaction fails
+
+**Possible causes:**
+1. Running on testnet/devnet (Stablelayer is mainnet-only)
+2. Insufficient USDC for minting (Cetus swap step failed)
+3. No LakeUSDC balance for burn/claim operations
+
+**Fix:**
+1. Verify `NEXT_PUBLIC_SUI_NETWORK=mainnet` for Stablelayer operations
+2. The runtime automatically skips Stablelayer actions on non-mainnet networks
+3. Check agent address holds required tokens for the specific operation
 
 ### Issue: Policy Check Fails On-Chain but Passes Off-Chain
 
@@ -319,21 +326,21 @@ sui client call \
 ### Daily
 
 - [ ] Sponsor wallet balance > 2 SUI
-- [ ] Agent wallet holds DEEP tokens
 - [ ] Frontend is accessible
 - [ ] zkLogin Enoki service is available
+- [ ] Cetus Aggregator API is reachable
 
 ### Before Demo
 
 - [ ] All tests pass (`npm test` + `cd contracts && sui move test`)
 - [ ] Frontend build succeeds (`npm run build`)
 - [ ] Pre-login with zkLogin (avoid waiting for ZK prover on stage)
-- [ ] Verify Testnet pool has liquidity (`npx tsx scripts/test-deepbook.ts`)
+- [ ] Verify Cetus Aggregator returns valid routes for SUI/USDC
 - [ ] Sponsor wallet balance sufficient (> 5 SUI)
-- [ ] DEEP token balance sufficient
-- [ ] Prepare fallback market data (in case DeepBook is unavailable)
+- [ ] Prepare fallback market data (in case Cetus API is unavailable)
 - [ ] Test Demo Mode panel with "Test Over-Limit" and "Test Normal" buttons
 - [ ] Test Guardrail Stress Test panel (all 5 tests should show BLOCKED)
+- [ ] If demoing Stablelayer: verify running on mainnet with LakeUSDC availability
 
 ### Security
 
@@ -357,16 +364,21 @@ const TESTNET_RPC = 'https://fullnode.testnet.sui.io:443';
 // Enoki ZK Prover
 const ENOKI_URL = 'https://api.enoki.mystenlabs.com/v1/zklogin/zkp';
 
-// DeepBook V3
-const DEEPBOOK_POOL_KEY = 'SUI_DBUSDC';
+// Cetus Aggregator
+const CETUS_DEFAULT_SLIPPAGE = 0.01; // 1%
+
+// Stablelayer (mainnet-only)
+const STABLE_COIN_TYPE = '0xb75744...::lake_usdc::LakeUSDC';
 
 // Unit Conversion
 // 1 SUI = 1,000,000,000 MIST (1e9)
-// DBUSDC uses 6 decimals (1e6)
+// USDC uses 6 decimals (1e6)
 
 // Action Types (matching Move contract)
 const ACTION_SWAP = 0;
-const ACTION_LIMIT_ORDER = 1;
+const ACTION_STABLE_MINT = 1;
+const ACTION_STABLE_BURN = 2;
+const ACTION_STABLE_CLAIM = 3;
 ```
 
 ---

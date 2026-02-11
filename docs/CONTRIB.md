@@ -2,7 +2,7 @@
 
 > 開發工作流程、測試程序、環境設定指南
 
-**Last Updated:** 2026-02-09
+**Last Updated:** 2026-02-11
 
 ---
 
@@ -104,7 +104,7 @@ sui client faucet --address <YOUR_ADDRESS>
 
 | Command                                                 | Description                      |
 |---------------------------------------------------------|----------------------------------|
-| `npm test`                                              | Run all TypeScript unit tests (67 tests) |
+| `npm test`                                              | Run all TypeScript unit tests (78 tests) |
 | `npm run test:watch`                                    | Watch mode unit tests            |
 | `npx vitest run lib/agent/__tests__/policy-checker.test.ts` | Run specific test file     |
 | `cd contracts && sui move test`                         | Run Move contract tests (15 tests) |
@@ -128,9 +128,7 @@ sui client publish --gas-budget 100000000
 
 ### Utility Scripts
 
-| Command                          | Description                                |
-|----------------------------------|--------------------------------------------|
-| `npx tsx scripts/test-deepbook.ts` | Test DeepBook V3 connectivity and pool status |
+Currently no standalone utility scripts. Cetus Aggregator and Stablelayer SDK connectivity is verified through the test suite and the agent runtime.
 
 ---
 
@@ -181,14 +179,15 @@ app/ (pages + API routes)
   +-- lib/agent/ (AI agent runtime)
   |     |     |
   |     |     +-- lib/vault/service.ts (on-chain queries)
-  |     |     +-- lib/sui/market.ts (DeepBook market data)
+  |     |     +-- lib/sui/market.ts (Cetus Aggregator market data)
+  |     |     +-- lib/vault/ptb-agent.ts (Cetus swap + Stablelayer PTBs, server-only)
   |     |     +-- LLM API (OpenAI / Gemini / Anthropic)
   |     |
-  +-- lib/vault/ptb-builder.ts (Programmable Transaction Block construction)
+  +-- lib/vault/ptb-builder.ts (Owner + basic agent PTBs, browser-safe)
   |     |
   +-- lib/auth/ (zkLogin + Sponsored TX)
   |     |
-  +-- lib/sui/ (SuiClient + DeepBookClient singletons)
+  +-- lib/sui/ (SuiClient + CetusClient + StablelayerClient singletons)
   |     |
   +-- lib/constants.ts (shared configuration)
 ```
@@ -278,14 +277,15 @@ The app uses two Zustand stores with different persistence characteristics:
 
 ### TypeScript Tests (Vitest)
 
-Current test coverage (67 tests across 5 files):
+Current test coverage (78 tests across 6 files):
 
 | Test File                   | Tests | Coverage Area                                    |
 |-----------------------------|-------|--------------------------------------------------|
-| `intent-parser.test.ts`     | 17    | JSON parsing, Zod validation, code block handling, Unicode, edge cases |
-| `policy-checker.test.ts`    | 10    | All 6 policy rules boundary conditions           |
+| `intent-parser.test.ts`     | 20    | JSON parsing, Zod validation, code block handling, Unicode, all action types |
+| `policy-checker.test.ts`    | 14    | All 6 policy rules boundary conditions + non-withdrawal actions |
 | `constants.test.ts`         | 11    | suiToMist and mistToSui unit conversion          |
-| `ptb-builder.test.ts`       | 15    | All PTB builders (create vault, deposit, withdraw, agent ops, swap) |
+| `ptb-builder.test.ts`       | 13    | Owner PTB builders (create vault, deposit, withdraw, agent ops) |
+| `ptb-agent.test.ts`         | 6     | Cetus swap + Stablelayer mint/burn/claim PTB builders |
 | `service.test.ts`           | 14    | On-chain vault queries, owner/agent caps, pagination |
 
 Test cases (intent-parser):
@@ -305,6 +305,11 @@ Test cases (intent-parser):
 - Take first code block when multiple exist
 - Handle JSON with escaped quotes
 - Accept boundary confidence values (0 and 1)
+- Parse stable_mint action with amount
+- Parse stable_burn action (no params)
+- Parse stable_claim action (no params)
+- Parse swap_usdc_to_sui action
+- Reject unknown action type
 
 Test cases (policy-checker):
 
@@ -318,6 +323,10 @@ Test cases (policy-checker):
 - Reject amount exceeding remaining budget
 - Reject non-whitelisted action type
 - Reject insufficient balance
+- Allow non-withdrawal action without amount (stable_burn)
+- Allow non-withdrawal action without amount (stable_claim)
+- Reject non-whitelisted non-withdrawal action
+- Reject expired non-withdrawal action
 
 Test cases (constants):
 
@@ -326,11 +335,17 @@ Test cases (constants):
 
 Test cases (ptb-builder):
 
-- buildCreateVault: gas coin, coinObjectId, empty allowedActions, zero deposit
+- buildCreateVault: gas coin, coinObjectId, empty allowedActions, multiple actions, zero deposit
 - buildDepositFromGas: valid params, zero amount, large amount
 - buildWithdrawAll, buildCreateAgentCap, buildRevokeAgentCap: valid params
 - buildAgentWithdraw: valid params, different action types
-- buildAgentSwap: valid swap, DeepBookClient call, custom poolKey
+
+Test cases (ptb-agent):
+
+- buildAgentCetusSwap: valid swap params, custom slippage
+- buildAgentStableMint: valid mint params
+- buildAgentStableBurn: valid burn params, burnAll flag
+- buildAgentStableClaim: valid claim params
 
 Test cases (service):
 
@@ -455,12 +470,18 @@ Vault ID may be from a different network (devnet vs testnet). Confirm `NEXT_PUBL
 
 Confirm Sui CLI version is compatible with `edition = "2024.beta"`. Check with `sui --version`.
 
-### DeepBook swap fails
+### Cetus swap fails
 
-1. Confirm Agent address holds DEEP tokens (required for fees)
-2. Confirm `minOut` is not set too high
-3. Confirm Testnet pool has sufficient liquidity (may need to place counterparty orders)
-4. Run `npx tsx scripts/test-deepbook.ts` to diagnose pool status
+1. Confirm Cetus Aggregator returns a valid route (`findRouters` returns non-empty `paths`)
+2. Confirm slippage tolerance is appropriate (default: 1%)
+3. Confirm SUI amount is above minimum required by Cetus routes
+4. Check agent logs for "Cetus: no swap route found" error messages
+
+### Stablelayer operation fails
+
+1. Stablelayer is **mainnet-only** -- operations will be skipped on testnet/devnet
+2. Confirm the agent address holds LakeUSDC tokens for burn/claim operations
+3. Verify the Stablelayer SDK version is compatible (`stable-layer-sdk@2.0.0`)
 
 ---
 

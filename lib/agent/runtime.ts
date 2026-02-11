@@ -64,7 +64,7 @@ function getActionType(action: string): number {
     case "stable_claim":
       return ACTION_STABLE_CLAIM;
     default:
-      return ACTION_SWAP;
+      throw new Error(`Unknown action type: ${action}`);
   }
 }
 
@@ -81,6 +81,11 @@ async function buildTransaction(params: {
   amountMist?: bigint;
 }): Promise<Transaction> {
   const { action, vaultId, agentCapId, agentAddress, ownerAddress, amountMist } = params;
+
+  // Guard: withdrawal actions require amountMist
+  if (WITHDRAWAL_ACTIONS.has(action) && amountMist === undefined) {
+    throw new Error(`Action '${action}' requires amountMist but none was provided`);
+  }
 
   switch (action) {
     case "swap_sui_to_usdc":
@@ -127,8 +132,6 @@ async function buildTransaction(params: {
 
     case "stable_burn":
       return buildAgentStableBurn({
-        vaultId,
-        agentCapId,
         agentAddress,
         ownerAddress,
       });

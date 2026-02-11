@@ -53,7 +53,13 @@ export interface VaultApiFields {
 
 export interface AgentLogEntry {
   decision: {
-    action: "swap_sui_to_usdc" | "swap_usdc_to_sui" | "hold";
+    action:
+      | "swap_sui_to_usdc"
+      | "swap_usdc_to_sui"
+      | "stable_mint"
+      | "stable_burn"
+      | "stable_claim"
+      | "hold";
     reasoning: string;
     confidence: number;
     params?: {
@@ -68,4 +74,14 @@ export interface AgentLogEntry {
   hasTransaction?: boolean;
   txDigest?: string | null;
   timestamp?: number;
+}
+
+/** Stablelayer position data for display and LLM context */
+export interface StablelayerPosition {
+  /** Amount of stablecoin minted (in smallest unit, 6 decimals) */
+  mintedAmount: bigint;
+  /** Accrued yield available to claim (in smallest unit) */
+  accruedYield: bigint;
+  /** Timestamp of last interaction */
+  lastUpdateTime: number;
 }

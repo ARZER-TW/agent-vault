@@ -45,6 +45,11 @@ export async function buildAgentCetusSwap(params: {
     slippage = CETUS_DEFAULT_SLIPPAGE,
   } = params;
 
+  // Validate slippage bounds (0-5%)
+  if (slippage < 0 || slippage > 0.05) {
+    throw new Error(`Slippage out of safe range: ${slippage}. Must be 0-5%.`);
+  }
+
   const tokens = getTokenTypes();
   const targetCoinType = params.targetCoinType ?? tokens.USDC;
 
@@ -176,8 +181,6 @@ export async function buildAgentStableMint(params: {
  * Uses Stablelayer buildBurnTx with autoTransfer to send result to owner.
  */
 export async function buildAgentStableBurn(params: {
-  vaultId: string;
-  agentCapId: string;
   agentAddress: string;
   ownerAddress: string;
   amount?: bigint;

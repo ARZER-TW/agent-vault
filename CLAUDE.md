@@ -17,9 +17,10 @@ https://github.com/ARZER-TW/agent-vault
 | 模組 | 狀態 | 測試 |
 |------|------|------|
 | Move 合約 | 已部署 Testnet | 15/15 |
-| DeepBook V3 SDK | 完成 | - |
+| Cetus Aggregator SDK | 完成 | 6/6 |
+| Stablelayer SDK | 完成 (mainnet-only) | 6/6 |
 | zkLogin 驗證 | 完成 | - |
-| Agent Runtime | 完成 | 20/20 |
+| Agent Runtime | 完成 | 78/78 |
 | 前端 (Vault Noir) | 完成 | - |
 | API Routes | 完成 | - |
 
@@ -57,12 +58,14 @@ lib/                    # 核心邏輯
     sponsored-tx.ts     # Sponsored 交易
   vault/                # Vault 相關
     service.ts          # 鏈上查詢
-    ptb-builder.ts      # PTB 構建器 (8 個)
+    ptb-builder.ts      # PTB 構建器 - 瀏覽器安全 (owner + basic agent ops)
+    ptb-agent.ts        # PTB 構建器 - 伺服器端 (Cetus swap + Stablelayer ops)
     types.ts            # 型別定義
   sui/                  # Sui SDK
     client.ts           # SuiClient singleton
-    deepbook.ts         # DeepBookClient
-    market.ts           # 市場數據查詢
+    cetus.ts            # Cetus Aggregator client
+    stablelayer.ts      # Stablelayer client (mainnet-only)
+    market.ts           # 市場數據查詢 (via Cetus)
     coins.ts            # Coin 物件查詢
   store/                # Zustand 狀態
     auth-store.ts
@@ -100,27 +103,40 @@ npm run build        # 生產建置
 npm run lint         # ESLint 檢查
 
 # 測試
-npm test             # 執行所有 vitest 測試 (20/20)
+npm test             # 執行所有 vitest 測試 (78/78)
 cd contracts && sui move test  # Move 合約測試 (15/15)
 
 # 檢查 SDK 版本
-npm ls @mysten/sui   # 必須只有 1.38.0，不能有重複
+npm ls @mysten/sui   # 確認版本一致性
 ```
 
 ## 開發規則
 
 ### SDK 版本相容性 (重要)
 
-- `@mysten/deepbook-v3@0.17.0` 硬性依賴 `@mysten/sui@1.38.0`
-- 必須鎖定 `@mysten/sui` 到 `1.38.0`，否則會出現 `experimental_asClientExtension` 型別錯誤
+- `stable-layer-sdk@2.0.0` 需要 `@mysten/sui@^1.44.0`
 - 安裝新套件後執行 `npm ls @mysten/sui` 檢查是否有重複版本
 
-### DeepBook V3 SDK
+### Cetus Aggregator SDK
 
-- Swap 方法是 **curried**: `dbClient.deepBook.swapExactBaseForQuote(params)(tx)`
-- 回傳 `[baseCoinResult, quoteCoinResult, deepCoinResult]`，三個都要 transfer
-- 提供 `baseCoin` (TransactionObjectArgument) 時，`amount` 參數會被忽略
-- DEEP_SCALAR = 1_000_000 (6 decimals)
+- `@cetusprotocol/aggregator-sdk@1.4.4` 提供跨 25+ DEX 的路由聚合
+- `findRouters()` 返回 `{ paths: [...], amountOut, insufficientLiquidity }`
+- `routerSwap()` 接受 `inputCoin` (TransactionObjectArgument) 執行鏈上 swap
+- 金額使用 `BN.js`: `new BN(amountMist.toString())`
+- 預設滑點: 1% (CETUS_DEFAULT_SLIPPAGE)
+
+### Stablelayer SDK
+
+- `stable-layer-sdk@2.0.0` 由 Bucket Protocol 提供
+- **僅限 mainnet** -- testnet/devnet 無合約部署
+- 三個核心操作: `buildMintTx`, `buildBurnTx`, `buildClaimTx`
+- LakeUSDC type: `0xb75744...::lake_usdc::LakeUSDC`
+
+### PTB 構建器架構 (Browser/Server 分離)
+
+- `ptb-builder.ts`: 瀏覽器安全，僅含 owner 操作 + buildAgentWithdraw
+- `ptb-agent.ts`: 伺服器端，含 Cetus swap + Stablelayer 操作
+- 原因: Cetus SDK 依賴 `@pythnetwork/pyth-sui-js` 使用 `node:buffer`，無法在瀏覽器打包
 
 ### Sui Move 合約
 
@@ -169,8 +185,14 @@ const CLOCK_OBJECT_ID = '0x6';
 const TESTNET_RPC = 'https://fullnode.testnet.sui.io:443';
 const ZKLOGIN_PROVER = 'https://prover-dev.mystenlabs.com/v1';
 
-// DeepBook V3
-const SUI_DBUSDC_POOL = 'SUI_DBUSDC';  // Pool key
+// Cetus Aggregator
+const CETUS_DEFAULT_SLIPPAGE = 0.01; // 1%
+
+// Action Types (對應 Move 合約)
+const ACTION_SWAP = 0;
+const ACTION_STABLE_MINT = 1;
+const ACTION_STABLE_BURN = 2;
+const ACTION_STABLE_CLAIM = 3;
 ```
 
 ## 禁止事項
@@ -179,15 +201,19 @@ const SUI_DBUSDC_POOL = 'SUI_DBUSDC';  // Pool key
 - 不要硬編碼 Package ID（用環境變數）
 - 不要跳過 Policy 檢查直接執行交易
 - 不要在 Move 合約中使用 `transfer::transfer` 轉移共享物件
-- 不要忘記處理 DEEP token 費用
-- 不要升級 `@mysten/sui` 超過 `1.38.0`（會破壞 DeepBook 相容性）
+- 不要在 "use client" 組件中 import `ptb-agent.ts`（會導致 webpack node:buffer 錯誤）
+- 不要在 testnet/devnet 執行 Stablelayer 操作（僅限 mainnet）
 
 ## 常見問題
 
-### DeepBook swap 失敗
-- 檢查是否有足夠的 DEEP token
-- 檢查 minOut 是否設置過高
-- 確認 pool 有足夠流動性
+### Cetus swap 失敗
+- 檢查 `findRouters()` 是否返回有效路由（`paths` 非空）
+- 確認滑點容忍度合適（預設 1%）
+- runtime 會自動 fallback 到 simple agent_withdraw
+
+### Stablelayer 操作失敗
+- 確認在 mainnet 環境（`STABLELAYER_AVAILABLE` 為 true）
+- runtime 會自動跳過 testnet/devnet 上的 stable_* 操作
 
 ### zkLogin 地址不一致
 - 確保使用相同的 salt
@@ -198,7 +224,7 @@ const SUI_DBUSDC_POOL = 'SUI_DBUSDC';  // Pool key
 - 確認 cooldown 計算正確
 - 驗證 AgentCap ID 在 Vault 的授權列表中
 
-### Build 失敗：experimental_asClientExtension
-- 原因：`@mysten/sui` 版本不匹配
-- 修復：`npm install @mysten/sui@1.38.0`
-- 驗證：`npm ls @mysten/sui` 應只顯示一個 1.38.0
+### Build 失敗：node:buffer (webpack)
+- 原因：在 "use client" 組件中直接或間接 import 了 Cetus SDK
+- 修復：確保前端組件只 import `ptb-builder.ts`（瀏覽器安全），不要 import `ptb-agent.ts`（伺服器端）
+- Cetus/Stablelayer 操作只能在 server-side 執行（API routes, runtime）

@@ -94,8 +94,6 @@ describe("buildAgentStableBurn", () => {
 
   it("returns a Transaction for valid burn params", async () => {
     const tx = await buildAgentStableBurn({
-      vaultId: "0xvault1",
-      agentCapId: "0xcap1",
       agentAddress: ADDR_AGENT,
       ownerAddress: ADDR_OWNER,
     });
@@ -105,8 +103,6 @@ describe("buildAgentStableBurn", () => {
 
   it("handles burnAll flag", async () => {
     const tx = await buildAgentStableBurn({
-      vaultId: "0xvault1",
-      agentCapId: "0xcap1",
       agentAddress: ADDR_AGENT,
       ownerAddress: ADDR_OWNER,
       burnAll: true,
