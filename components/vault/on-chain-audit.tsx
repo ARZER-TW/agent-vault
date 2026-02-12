@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getVaultEvents } from "@/lib/vault/service";
-import { mistToSui, ACTION_LABELS } from "@/lib/constants";
+import { mistToSui, ACTION_LABELS, SUI_NETWORK } from "@/lib/constants";
 import type { VaultEvent } from "@/lib/vault/types";
 
 function truncateDigest(digest: string): string {
@@ -11,7 +11,7 @@ function truncateDigest(digest: string): string {
 }
 
 function EventRow({ event }: { event: VaultEvent }) {
-  const suiScanUrl = `https://suiscan.xyz/testnet/tx/${event.txDigest}`;
+  const suiScanUrl = `https://suiscan.xyz/${SUI_NETWORK}/tx/${event.txDigest}`;
   const amountSui = mistToSui(BigInt(event.amount));
   const actionLabel = ACTION_LABELS[event.actionType] ?? `Action ${event.actionType}`;
   const time = event.timestamp > 0

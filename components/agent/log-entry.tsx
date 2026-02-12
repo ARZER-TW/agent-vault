@@ -1,8 +1,9 @@
 "use client";
 
 import type { AgentLogEntry } from "@/lib/vault/types";
+import { SUI_NETWORK } from "@/lib/constants";
 
-const EXPLORER_BASE = "https://suiscan.xyz/testnet/tx";
+const EXPLORER_BASE = `https://suiscan.xyz/${SUI_NETWORK}/tx`;
 
 interface LogEntryProps {
   result: AgentLogEntry;
