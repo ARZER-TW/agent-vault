@@ -50,7 +50,7 @@ All environment variables reference:
 | `NEXT_PUBLIC_GOOGLE_CLIENT_ID`  | Yes      | Client       | Google OAuth 2.0 Client ID (for zkLogin)                     |
 | `GOOGLE_CLIENT_SECRET`          | Yes      | Server       | Google OAuth 2.0 Client Secret                               |
 | `NEXT_PUBLIC_REDIRECT_URI`      | Yes      | Client       | OAuth callback URL (default: `http://localhost:3000/auth/callback`) |
-| ~~`NEXT_PUBLIC_ENOKI_API_KEY`~~ | No       | --           | Removed: now uses Mysten public ZK prover (no API key needed) |
+| `NEXT_PUBLIC_ENOKI_API_KEY`     | Yes      | Client       | Mysten Enoki API key (for zkLogin ZK proof generation)       |
 | `OPENAI_API_KEY`                | One of three | Server   | OpenAI API key (`sk-...`). Model: `gpt-4o`                   |
 | `GEMINI_API_KEY`                | One of three | Server   | Google Gemini API key. Model: `gemini-2.0-flash`             |
 | `ANTHROPIC_API_KEY`             | One of three | Server   | Anthropic API key (`sk-ant-...`). Model: `claude-sonnet-4-20250514`      |
@@ -81,11 +81,11 @@ sui client faucet --address <YOUR_ADDRESS>
 3. Add authorized redirect URI: `http://localhost:3000/auth/callback`
 4. Copy Client ID and Secret to `.env.local`
 
-### 5. ZK Prover (No Setup Required)
+### 5. Enoki API Key Setup
 
-zkLogin ZK proofs are generated via Mysten Labs public prover (free, no API key).
-- Testnet: `https://prover-dev.mystenlabs.com/v1`
-- Mainnet: `https://prover.mystenlabs.com/v1`
+1. Go to [Mysten Enoki Portal](https://enoki.mystenlabs.com/)
+2. Create a project and obtain an API key
+3. Set `NEXT_PUBLIC_ENOKI_API_KEY` in `.env.local`
 
 ---
 

@@ -37,7 +37,9 @@ coverage/
 # Sui / Move
 contracts/build/
 *.mv
+*.key
 
 # Misc
 *.tsbuildinfo
 .vercel
+~$*

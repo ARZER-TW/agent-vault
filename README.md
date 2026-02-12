@@ -57,7 +57,7 @@ cp .env.example .env.local
 | Variable | Purpose |
 |----------|---------|
 | `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | Google OAuth Client ID for zkLogin |
-| ~~`NEXT_PUBLIC_ENOKI_API_KEY`~~ | Removed: uses Mysten public ZK prover (no key needed) |
+| `NEXT_PUBLIC_ENOKI_API_KEY` | Enoki API key for ZK proof generation |
 | `SPONSOR_PRIVATE_KEY` | Sui keypair (bech32 `suiprivkey1...`) that pays gas |
 | `AGENT_PRIVATE_KEY` | Sui keypair for the AI agent wallet |
 
