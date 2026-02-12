@@ -12,8 +12,16 @@ const PRESET_STRATEGIES = [
     value: "Only swap SUI to USDC when the mid price is above $3.50. If price is below $3.50, hold and wait for better conditions.",
   },
   {
+    label: "Yield Farming",
+    value: "Swap SUI to USDC via Cetus, then mint LakeUSDC via Stablelayer to earn yield. Use stable_mint with 50% of max-per-tx limit. Periodically use stable_claim to collect accrued yield.",
+  },
+  {
+    label: "Stablecoin Hedge",
+    value: "When SUI price drops below $2.00, swap SUI to USDC and mint stablecoins via Stablelayer for safety. When price rises above $4.00, burn stablecoins back. Otherwise hold.",
+  },
+  {
     label: "Aggressive Trading",
-    value: "Use the maximum per-tx amount for every swap. Always swap SUI to USDC. Maximize trading volume.",
+    value: "Use the maximum per-tx amount for every swap via Cetus Aggregator. Always swap SUI to USDC. Maximize trading volume.",
   },
   {
     label: "Minimal Risk",
