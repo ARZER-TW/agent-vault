@@ -2,7 +2,7 @@
 
 > **"Don't give your AI agent the keys. Give it a budget."**
 
-Policy-Based AI Agent Custody on Sui -- HackMoney 2026 (ETHGlobal)
+Policy-Based AI Agent Custody on Sui 
 
 ## What is Suistody?
 
