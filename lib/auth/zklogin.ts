@@ -6,7 +6,6 @@ import {
   getZkLoginSignature,
   decodeJwt,
   computeZkLoginAddressFromSeed,
-  genAddressSeed,
 } from "@mysten/sui/zklogin";
 import type { ZkLoginSignatureInputs } from "@mysten/sui/zklogin";
 import { getSuiClient } from "@/lib/sui/client";
@@ -16,11 +15,9 @@ const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
 const REDIRECT_URI =
   process.env.NEXT_PUBLIC_REDIRECT_URI ?? "http://localhost:3000/auth/callback";
 
-// Mysten Labs public ZK prover (free, no API key required)
-const PROVER_URL =
-  SUI_NETWORK === "mainnet"
-    ? "https://prover.mystenlabs.com/v1"
-    : "https://prover-dev.mystenlabs.com/v1";
+// Enoki API for ZK proof generation
+const ENOKI_API_KEY = process.env.NEXT_PUBLIC_ENOKI_API_KEY ?? "";
+const ENOKI_URL = "https://api.enoki.mystenlabs.com/v1/zklogin/zkp";
 
 // -- Session storage keys --
 const EPHEMERAL_KEY_PAIR_KEY = "zklogin_ephemeral_keypair";
@@ -77,47 +74,36 @@ export async function beginZkLogin(): Promise<string> {
 }
 
 /**
- * Derive a deterministic salt from the user's `sub` claim.
- * The salt ensures the same Google account always maps to the same zkLogin address.
+ * Fetch ZK proof via Enoki API.
  */
-function deriveSalt(sub: string): string {
-  let hash = BigInt(0);
-  for (let i = 0; i < sub.length; i++) {
-    hash = hash * BigInt(31) + BigInt(sub.charCodeAt(i));
-  }
-  const mask = (BigInt(1) << BigInt(128)) - BigInt(1);
-  return (hash & mask).toString();
-}
-
-/**
- * Fetch ZK proof via Mysten Labs public prover.
- */
-async function fetchZkProof(params: {
+async function fetchProofEnoki(params: {
   jwt: string;
   ephemeralPublicKey: string;
   maxEpoch: number;
   randomness: string;
-  salt: string;
-}): Promise<Omit<ZkLoginSignatureInputs, "addressSeed">> {
-  const response = await fetch(PROVER_URL, {
+}): Promise<ZkLoginSignatureInputs> {
+  const response = await fetch(ENOKI_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${ENOKI_API_KEY}`,
+      "zklogin-jwt": params.jwt,
+    },
     body: JSON.stringify({
-      jwt: params.jwt,
-      extendedEphemeralPublicKey: params.ephemeralPublicKey,
-      maxEpoch: String(params.maxEpoch),
-      jwtRandomness: params.randomness,
-      salt: params.salt,
-      keyClaimName: "sub",
+      network: SUI_NETWORK,
+      ephemeralPublicKey: params.ephemeralPublicKey,
+      maxEpoch: params.maxEpoch,
+      randomness: params.randomness,
     }),
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`ZK prover error (${response.status}): ${errorText}`);
+    throw new Error(`Enoki prover error (${response.status}): ${errorText}`);
   }
 
-  return await response.json();
+  const json = await response.json();
+  return json.data as ZkLoginSignatureInputs;
 }
 
 /**
@@ -146,34 +132,28 @@ export async function completeZkLogin(params: {
     ephemeralKeypair.getPublicKey(),
   );
 
-  // Decode JWT to extract claims
+  // Decode JWT
   const decoded = decodeJwt(jwt);
 
-  // Derive deterministic salt from user's sub claim
-  const salt = deriveSalt(decoded.sub);
+  // Fetch ZK proof via Enoki (uses Enoki's managed salt internally)
+  if (!ENOKI_API_KEY) {
+    throw new Error("ENOKI_API_KEY is required for zkLogin proof generation.");
+  }
 
-  // Fetch ZK proof via Mysten public prover
-  const proof = await fetchZkProof({
+  const zkProof = await fetchProofEnoki({
     jwt,
     ephemeralPublicKey: extendedEphemeralPublicKey,
     maxEpoch,
     randomness,
-    salt,
   });
 
-  // Compute addressSeed from salt + JWT claims
-  const addressSeed = genAddressSeed(
-    BigInt(salt),
-    "sub",
-    decoded.sub,
-    decoded.aud,
-  ).toString();
+  if (!zkProof.addressSeed) {
+    throw new Error("Enoki did not return addressSeed in proof response.");
+  }
 
-  const zkProof: ZkLoginSignatureInputs = { ...proof, addressSeed };
-
-  // Derive zkLogin address from addressSeed
+  // Derive address from Enoki's addressSeed (must match the proof)
   const finalAddress = computeZkLoginAddressFromSeed(
-    BigInt(addressSeed),
+    BigInt(zkProof.addressSeed),
     decoded.iss,
   );
 
@@ -183,7 +163,7 @@ export async function completeZkLogin(params: {
     maxEpoch,
     randomness,
     jwt,
-    userSalt: salt,
+    userSalt: "",
     zkProof,
   };
 }
