@@ -62,7 +62,7 @@ vercel
 # - NEXT_PUBLIC_GOOGLE_CLIENT_ID
 # - GOOGLE_CLIENT_SECRET
 # - NEXT_PUBLIC_REDIRECT_URI  (change to production URL)
-# - NEXT_PUBLIC_ENOKI_API_KEY
+# (NEXT_PUBLIC_ENOKI_API_KEY removed - uses Mysten public prover)
 # - OPENAI_API_KEY (or GEMINI_API_KEY or ANTHROPIC_API_KEY)
 # - SPONSOR_PRIVATE_KEY
 # - AGENT_PRIVATE_KEY
@@ -138,16 +138,14 @@ sui client objects --address <AGENT_ADDRESS>
 **Symptoms:** User sees "ZK prover error" on the callback page after Google login
 
 **Possible causes:**
-1. Mysten Enoki API service temporarily unavailable
+1. Mysten ZK prover service temporarily unavailable
 2. Ephemeral keypair expired (maxEpoch has passed)
 3. JWT token invalid or expired
-4. ENOKI_API_KEY missing or invalid
 
 **Fix:**
-1. Wait a few minutes and retry (Enoki service may be in maintenance)
+1. Wait a few minutes and retry (prover service may be in maintenance)
 2. Clear browser `sessionStorage` and log in again
 3. Verify Google OAuth Client ID is correct
-4. Verify `NEXT_PUBLIC_ENOKI_API_KEY` is set in `.env.local`
 
 ### Issue: "No LLM API key found"
 
@@ -361,8 +359,9 @@ const CLOCK_OBJECT_ID = '0x6';
 // Network
 const TESTNET_RPC = 'https://fullnode.testnet.sui.io:443';
 
-// Enoki ZK Prover
-const ENOKI_URL = 'https://api.enoki.mystenlabs.com/v1/zklogin/zkp';
+// Mysten ZK Prover (free, no API key)
+// testnet: https://prover-dev.mystenlabs.com/v1
+// mainnet: https://prover.mystenlabs.com/v1
 
 // Cetus Aggregator
 const CETUS_DEFAULT_SLIPPAGE = 0.01; // 1%
